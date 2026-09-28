@@ -4,7 +4,12 @@ import AppKit
 
 struct DashboardView: View {
     @Environment(AppModel.self) private var model
-    private let cards = ["Battery", "Power", "GPU", "CPU", "Memory", "Disk", "Network", "Thermal", "Processes", "Sleep blockers", "System"]
+    private var cards: [String] {
+        var values = ["Battery", "Power", "GPU", "CPU", "Memory", "Disk", "Network", "Thermal", "Processes", "Sleep blockers", "System"]
+        if !model.snapshot.bluetooth.isEmpty { values.append("Bluetooth") }
+        if !model.snapshot.fans.isEmpty { values.append("Fans") }
+        return values
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -61,7 +66,7 @@ private struct CardView: View {
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(.quaternary, lineWidth: 0.5))
     }
     private var icon: String {
-        ["Battery":"battery.100percent", "Power":"bolt.fill", "GPU":"display", "CPU":"cpu", "Memory":"memorychip", "Disk":"internaldrive", "Network":"wifi", "Thermal":"thermometer.medium", "Processes":"list.number", "Sleep blockers":"moon.zzz", "System":"desktopcomputer"][title] ?? "circle"
+        ["Battery":"battery.100percent", "Power":"bolt.fill", "GPU":"display", "CPU":"cpu", "Memory":"memorychip", "Disk":"internaldrive", "Network":"wifi", "Thermal":"thermometer.medium", "Processes":"list.number", "Sleep blockers":"moon.zzz", "System":"desktopcomputer", "Bluetooth":"headphones", "Fans":"fanblades"][title] ?? "circle"
     }
 
     @ViewBuilder private var content: some View {
@@ -70,13 +75,15 @@ private struct CardView: View {
         case "Power": power
         case "GPU": gpu
         case "CPU": cpu
-        case "Memory": rows([("Used", DisplayValue.bytes(model.snapshot.memory.used)), ("Wired", DisplayValue.bytes(model.snapshot.memory.wired)), ("Compressed", DisplayValue.bytes(model.snapshot.memory.compressed)), ("Pressure", model.snapshot.memory.pressure ?? "n/a"), ("Physical RAM", DisplayValue.decimal(model.snapshot.system.memoryGB, suffix: " GB"))])
-        case "Disk": rows([("Boot volume used", model.snapshot.disk.total.flatMap { total in model.snapshot.disk.free.map { DisplayValue.bytes(total - $0) } } ?? "n/a"), ("Available", DisplayValue.bytes(model.snapshot.disk.free)), ("Total", DisplayValue.bytes(model.snapshot.disk.total))])
+        case "Memory": memory
+        case "Disk": disk
         case "Network": network
         case "Thermal": thermal
         case "Processes": processes
         case "Sleep blockers": sleepBlockers
         case "System": system
+        case "Bluetooth": bluetooth
+        case "Fans": fans
         default: EmptyView()
         }
     }
@@ -142,6 +149,8 @@ private struct CardView: View {
     private var cpu: some View {
         VStack(spacing: 6) {
             HStack { Text("Total"); Spacer(); Text(DisplayValue.decimal(model.snapshot.cpu.load.map { $0 * 100 }, suffix: "%")).monospacedDigit() }
+            rows([("User", DisplayValue.decimal(model.snapshot.cpu.user, digits: 0, suffix: "%")), ("System", DisplayValue.decimal(model.snapshot.cpu.system, digits: 0, suffix: "%")), ("Idle", DisplayValue.decimal(model.snapshot.cpu.idle, digits: 0, suffix: "%")), ("Load average 1 / 5 / 15", model.snapshot.cpu.loadAverage.map { DisplayValue.decimal($0, digits: 2) }.joined(separator: " / ").isEmpty ? "n/a" : model.snapshot.cpu.loadAverage.map { DisplayValue.decimal($0, digits: 2) }.joined(separator: " / ")), ("Processes", DisplayValue.number(model.snapshot.cpu.processCount))])
+            HStack(spacing: 8) { clusterBar("E", value: model.snapshot.cpu.eAverage, tint: .teal); clusterBar("P", value: model.snapshot.cpu.pAverage, tint: .orange) }
             Chart(model.cpuHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("CPU", value)).foregroundStyle(.tint) } }
                 .chartYScale(domain: 0...100).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 36).transaction { $0.animation = nil }.accessibilityLabel("CPU usage history")
             HStack(spacing: 5) {
@@ -156,11 +165,57 @@ private struct CardView: View {
             HStack { Text("E \(DisplayValue.number(model.snapshot.system.eCores))"); Spacer(); Text("P \(DisplayValue.number(model.snapshot.system.pCores))"); Spacer(); Text("\(model.snapshot.system.cpuCores) cores") }.font(.caption2).foregroundStyle(.secondary)
         }
     }
+    private var memory: some View {
+        VStack(spacing: 7) {
+            usageCapsule(model.snapshot.memory.usedPercent, tint: .blue)
+            rows([("Used", DisplayValue.bytes(model.snapshot.memory.used)), ("Free", DisplayValue.bytes(model.snapshot.memory.free)), ("App memory", DisplayValue.bytes(model.snapshot.memory.app)), ("Cached files", DisplayValue.bytes(model.snapshot.memory.cached)), ("Wired", DisplayValue.bytes(model.snapshot.memory.wired)), ("Compressed", DisplayValue.bytes(model.snapshot.memory.compressed)), ("Swap used", DisplayValue.bytes(model.snapshot.memory.swapUsed)), ("Page in / out per sec", "\(DisplayValue.decimal(model.snapshot.memory.pageInPerSecond, digits: 0)) / \(DisplayValue.decimal(model.snapshot.memory.pageOutPerSecond, digits: 0))"), ("Pressure", model.snapshot.memory.pressure ?? "n/a")])
+            Chart(model.memoryHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Used %", v)).foregroundStyle(.blue) } }.chartYScale(domain: 0...100).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).transaction { $0.animation = nil }
+        }
+    }
+    private var disk: some View {
+        VStack(spacing: 7) {
+            usageCapsule(model.snapshot.disk.total.flatMap { total in model.snapshot.disk.free.map { Double(total - $0) / Double(total) * 100 } }, tint: .purple)
+            rows([("Volume", model.snapshot.disk.volumeName ?? "n/a"), ("File system", model.snapshot.disk.fileSystem ?? "n/a"), ("Available incl. purgeable", DisplayValue.bytes(model.snapshot.disk.importantFree)), ("Boot volume used", model.snapshot.disk.total.flatMap { total in model.snapshot.disk.free.map { DisplayValue.bytes(total - $0) } } ?? "n/a"), ("Available", DisplayValue.bytes(model.snapshot.disk.free)), ("Total", DisplayValue.bytes(model.snapshot.disk.total)), ("SMART status", model.snapshot.disk.smartStatus ?? "n/a"), ("Read", rate(model.snapshot.diskIO.readBytesPerSecond)), ("Write", rate(model.snapshot.diskIO.writeBytesPerSecond)), ("Read IOPS", DisplayValue.decimal(model.snapshot.diskIO.readIOPS, digits: 0)), ("Write IOPS", DisplayValue.decimal(model.snapshot.diskIO.writeIOPS, digits: 0))])
+            ForEach(model.snapshot.disk.externalVolumes) { volume in rows([(volume.name, "\(DisplayValue.bytes(volume.free)) / \(DisplayValue.bytes(volume.total))")]) }
+            Chart { ForEach(model.diskReadHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Series", "Read")) } }; ForEach(model.diskWriteHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Series", "Write")) } } }
+                .chartForegroundStyleScale(["Read": Color.blue, "Write": Color.orange]).chartLegend(position: .bottom, alignment: .leading, spacing: 4).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 44).transaction { $0.animation = nil }
+        }
+    }
+    private var bluetooth: some View {
+        VStack(spacing: 5) { ForEach(model.snapshot.bluetooth) { device in HStack { Text(device.name); Spacer(); Text("\(device.percent)%").foregroundStyle(device.percent < 20 ? .orange : .secondary) }.font(.caption) } }
+    }
+    private var fans: some View {
+        VStack(spacing: 5) { ForEach(model.snapshot.fans) { fan in HStack { Text("Fan \(fan.id + 1)"); Spacer(); Text(fan.rpm.map { DisplayValue.decimal($0, digits: 0, suffix: " RPM") } ?? "n/a") }.font(.caption) } }
+    }
+    private func clusterBar(_ title: String, value: Double?, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) { HStack { Text(title); Spacer(); Text(DisplayValue.decimal(value.map { $0 * 100 }, digits: 0, suffix: "%")) }; ProgressView(value: value ?? 0).tint(tint) }.font(.caption2).frame(maxWidth: .infinity)
+    }
+    private func usageCapsule(_ percent: Double?, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) { HStack { Text("Usage"); Spacer(); Text(DisplayValue.decimal(percent, digits: 0, suffix: "%")) }; ProgressView(value: min(1, max(0, (percent ?? 0) / 100))).tint(tint) }.font(.caption2)
+    }
+    private func stateColor(_ state: Int) -> Color { let colors: [Color] = [.green, .yellow, .orange, .red]; return colors.indices.contains(state) ? colors[state] : .gray }
+
     private var network: some View {
-        rows([("Down", rate(model.snapshot.network.downBytesPerSecond)), ("Up", rate(model.snapshot.network.upBytesPerSecond)), ("Wi-Fi RSSI", model.snapshot.network.rssi.map { "\($0) dBm" } ?? "n/a"), ("Channel", model.snapshot.network.channel ?? "n/a"), ("Link rate", DisplayValue.decimal(model.snapshot.network.linkMbps, suffix: " Mbps"))])
+        VStack(spacing: 7) {
+            rows([("Down", rate(model.snapshot.network.downBytesPerSecond)), ("Up", rate(model.snapshot.network.upBytesPerSecond)), ("Interface", model.snapshot.network.interfaceName ?? "n/a"), ("Local IPv4", model.snapshot.network.localIPv4 ?? "n/a"), ("Wi-Fi RSSI", model.snapshot.network.rssi.map { "\($0) dBm" } ?? "n/a"), ("Noise / SNR", "\(model.snapshot.network.noise.map(String.init) ?? "n/a") / \(model.snapshot.network.snr.map(String.init) ?? "n/a") dBm"), ("Channel", model.snapshot.network.channel ?? "n/a"), ("Link rate", DisplayValue.decimal(model.snapshot.network.linkMbps, suffix: " Mbps")), ("PHY mode", model.snapshot.network.phyMode ?? "n/a"), ("Security", model.snapshot.network.security ?? "n/a"), ("TX power", model.snapshot.network.transmitPower.map { "\($0) dBm" } ?? "n/a"), ("Totals since boot", "\(DisplayValue.bytes(model.snapshot.network.totalDown)) / \(DisplayValue.bytes(model.snapshot.network.totalUp))"), ("VPN", model.snapshot.network.vpnActive.map { $0 ? "Active" : "Off" } ?? "n/a")])
+            Chart {
+                ForEach(model.networkDownHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Direction", "Down")) } }
+                ForEach(model.networkUpHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Direction", "Up")) } }
+            }.chartForegroundStyleScale(["Down": Color.blue, "Up": Color.orange]).chartLegend(.hidden).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).transaction { $0.animation = nil }
+        }
     }
     private var thermal: some View {
-        HStack { Circle().fill(thermalColor).frame(width: 9, height: 9); Text(thermalName).foregroundStyle(.primary); Spacer() }.accessibilityElement(children: .combine)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack { Circle().fill(thermalColor).frame(width: 9, height: 9); Text(thermalName).foregroundStyle(.primary); Spacer() }
+            let groups = ["CPU/SoC", "Battery", "SSD", "Other"]
+            ForEach(groups, id: \.self) { group in
+                let values = model.snapshot.temperatures.sensors.filter { $0.group == group }.map(\.celsius)
+                if !values.isEmpty { rows([(group, "avg \(temperature(values.reduce(0, +) / Double(values.count))) · max \(temperature(values.max()))")]) }
+            }
+            Chart(model.temperatureHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("°C", v)).foregroundStyle(.red) } }
+                .chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 30).transaction { $0.animation = nil }
+            HStack(spacing: 1) { ForEach(Array(model.thermalTimeline.enumerated()), id: \.offset) { _, state in Rectangle().fill(stateColor(state)).frame(height: 6) } }.clipShape(Capsule())
+        }
     }
     private var processes: some View {
         VStack(spacing: 7) {
