@@ -862,7 +862,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Keine"
+            "value": "Keiner"
           }
         }
       }
@@ -2903,6 +2903,786 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ein Temperatursensor hat den Grenzwert überschritten."
+          }
+        }
+      }
+    },
+    "Overlay mode": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overlay-Modus"
+          }
+        }
+      }
+    },
+    "Overlay on: press ⌃⌥O to exit": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overlay aktiv: Zum Beenden ⌃⌥O drücken"
+          }
+        }
+      }
+    },
+    "Drag to position": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zum Positionieren ziehen"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fertig"
+          }
+        }
+      }
+    },
+    "Overlay Mode": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overlay-Modus"
+          }
+        }
+      }
+    },
+    "Move Overlay…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overlay verschieben …"
+          }
+        }
+      }
+    },
+    "Enable telemetry overlay": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telemetrie-Overlay aktivieren"
+          }
+        }
+      }
+    },
+    "Global shortcut": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Globaler Kurzbefehl"
+          }
+        }
+      }
+    },
+    "Control–Option–O": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control–Option–O"
+          }
+        }
+      }
+    },
+    "Control–Option–Command–O": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control–Option–Command–O"
+          }
+        }
+      }
+    },
+    "Control–Option–P": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control–Option–P"
+          }
+        }
+      }
+    },
+    "Control–Option–H": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control–Option–H"
+          }
+        }
+      }
+    },
+    "The shortcut toggles the click-through HUD without changing dashboard pin state.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Kurzbefehl schaltet das durchklickbare HUD um, ohne den Fixierstatus des Dashboards zu ändern."
+          }
+        }
+      }
+    },
+    "Metrics and layout": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Messwerte und Layout"
+          }
+        }
+      }
+    },
+    "Layout": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layout"
+          }
+        }
+      }
+    },
+    "Vertical list": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vertikale Liste"
+          }
+        }
+      }
+    },
+    "Horizontal bar": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontale Leiste"
+          }
+        }
+      }
+    },
+    "Show metric names": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Messwertnamen anzeigen"
+          }
+        }
+      }
+    },
+    "Show 30-second sparklines": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30-Sekunden-Verläufe anzeigen"
+          }
+        }
+      }
+    },
+    "Appearance": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Darstellung"
+          }
+        }
+      }
+    },
+    "Background": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hintergrund"
+          }
+        }
+      }
+    },
+    "Subtle dark pill": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dezente dunkle Fläche"
+          }
+        }
+      }
+    },
+    "Blurred material": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unscharfes Material"
+          }
+        }
+      }
+    },
+    "Accent color": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akzentfarbe"
+          }
+        }
+      }
+    },
+    "Blue": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blau"
+          }
+        }
+      }
+    },
+    "Green": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grün"
+          }
+        }
+      }
+    },
+    "Orange": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orange"
+          }
+        }
+      }
+    },
+    "Purple": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Violett"
+          }
+        }
+      }
+    },
+    "Background opacity": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hintergrunddeckkraft"
+          }
+        }
+      }
+    },
+    "Text opacity": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Textdeckkraft"
+          }
+        }
+      }
+    },
+    "Corner radius": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eckenradius"
+          }
+        }
+      }
+    },
+    "Text scale": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Textgröße"
+          }
+        }
+      }
+    },
+    "Sample interval": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abtastintervall"
+          }
+        }
+      }
+    },
+    "Color values by thresholds": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Werte nach Grenzwerten einfärben"
+          }
+        }
+      }
+    },
+    "CPU warning %": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CPU-Warnung %"
+          }
+        }
+      }
+    },
+    "GPU warning %": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPU-Warnung %"
+          }
+        }
+      }
+    },
+    "Temperature warning °C": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temperaturwarnung °C"
+          }
+        }
+      }
+    },
+    "Show hint on enter": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hinweis beim Aktivieren anzeigen"
+          }
+        }
+      }
+    },
+    "Hide when CPU and GPU are idle": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei inaktiver CPU und GPU ausblenden"
+          }
+        }
+      }
+    },
+    "Hide from screen capture": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bei Bildschirmaufnahmen ausblenden"
+          }
+        }
+      }
+    },
+    "Position and display": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position und Bildschirm"
+          }
+        }
+      }
+    },
+    "Anchor": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anker"
+          }
+        }
+      }
+    },
+    "Top left": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oben links"
+          }
+        }
+      }
+    },
+    "Top center": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oben mittig"
+          }
+        }
+      }
+    },
+    "Top right": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oben rechts"
+          }
+        }
+      }
+    },
+    "Bottom left": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unten links"
+          }
+        }
+      }
+    },
+    "Bottom center": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unten mittig"
+          }
+        }
+      }
+    },
+    "Bottom right": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unten rechts"
+          }
+        }
+      }
+    },
+    "Left center": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Links mittig"
+          }
+        }
+      }
+    },
+    "Right center": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechts mittig"
+          }
+        }
+      }
+    },
+    "Follow display under pointer": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bildschirm unter dem Zeiger verwenden"
+          }
+        }
+      }
+    },
+    "Saved display": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gespeicherter Bildschirm"
+          }
+        }
+      }
+    },
+    "Horizontal offset": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontaler Versatz"
+          }
+        }
+      }
+    },
+    "Vertical offset": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vertikaler Versatz"
+          }
+        }
+      }
+    },
+    "Move overlay…": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overlay verschieben …"
+          }
+        }
+      }
+    },
+    "Preview for 5 seconds": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 Sekunden Vorschau"
+          }
+        }
+      }
+    },
+    "Move mode accepts a drag. Press Return, Escape, or Done; it ends after 30 seconds of inactivity.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Verschiebemodus ziehen. Mit Eingabe, Escape oder Fertig beenden; nach 30 Sekunden ohne Aktivität endet der Modus automatisch."
+          }
+        }
+      }
+    },
+    "Metrics without available hardware support display n/a.": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht verfügbare Hardwarewerte werden als n/a angezeigt."
+          }
+        }
+      }
+    },
+    "CPU power W": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CPU-Leistung W"
+          }
+        }
+      }
+    },
+    "GPU power W": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GPU-Leistung W"
+          }
+        }
+      }
+    },
+    "Total power W": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gesamtleistung W"
+          }
+        }
+      }
+    },
+    "CPU temp": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CPU-Temperatur"
+          }
+        }
+      }
+    },
+    "Hottest temp": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Höchste Temperatur"
+          }
+        }
+      }
+    },
+    "Network down": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Netzwerk Download"
+          }
+        }
+      }
+    },
+    "Network up": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Netzwerk Upload"
+          }
+        }
+      }
+    },
+    "Disk read": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datenträger Lesen"
+          }
+        }
+      }
+    },
+    "Disk write": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datenträger Schreiben"
+          }
+        }
+      }
+    },
+    "Thermal state": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wärmezustand"
+          }
+        }
+      }
+    },
+    "Top process": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prozess mit höchster CPU-Last"
+          }
+        }
+      }
+    },
+    "Clock time": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uhrzeit"
+          }
+        }
+      }
+    },
+    "Battery power": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batterieleistung"
+          }
+        }
+      }
+    },
+    "CPU temperature": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CPU-Temperatur"
+          }
+        }
+      }
+    },
+    "Overlay on: press %@ to exit": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overlay aktiv: Zum Beenden %@ drücken"
+          }
+        }
+      }
+    },
+    "SiliconPulse system telemetry overlay": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SiliconPulse-Systemtelemetrie-Overlay"
+          }
+        }
+      }
+    },
+    "Exit Overlay": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overlay beenden"
+          }
+        }
+      }
+    },
+    "RAM warning %": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "RAM-Warnung %"
+          }
+        }
+      }
+    },
+    "Battery red below %": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batterie rot unter %"
+          }
+        }
+      }
+    },
+    "Battery orange below %": {
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batterie orange unter %"
           }
         }
       }

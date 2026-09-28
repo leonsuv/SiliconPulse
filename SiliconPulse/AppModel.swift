@@ -11,6 +11,7 @@ import UserNotifications
 
     var snapshot = TelemetrySnapshot()
     var cpuHistory: [TelemetryPoint] = []; var gpuHistory: [TelemetryPoint] = []
+    var overlayTick = 0
     var diskReadHistory: [TelemetryPoint] = []; var diskWriteHistory: [TelemetryPoint] = []
     var powerHistory: [TelemetryPoint] = []; var batteryPowerHistory: [TelemetryPoint] = []
     var memoryHistory: [TelemetryPoint] = []; var networkDownHistory: [TelemetryPoint] = []; var networkUpHistory: [TelemetryPoint] = []
@@ -63,6 +64,8 @@ import UserNotifications
     private var sampleDates: [String: Date] = [:]
     private var chartIndex = 0
     private var timer: Task<Void, Never>?
+    private var overlayTask: Task<Void, Never>?
+    private var overlaySampling = false
     private var bluetoothDiscoveryDone = false; private var fansDiscoveryDone = false
     private var highCPUStart: Date?
     private var lastAlerts: [String: Date] = [:]
@@ -70,6 +73,7 @@ import UserNotifications
     var onMenuLabelUpdate: (() -> Void)?
 
     func start(open: Bool) {
+        guard !overlaySampling else { return }
         popoverOpen = open
         timer?.cancel()
         timer = Task {
@@ -82,14 +86,85 @@ import UserNotifications
     }
     func startMenuTimer() { if timer == nil { start(open: false) } }
     func setPopoverOpen(_ open: Bool) {
-        guard popoverOpen != open else { return }
+        guard !overlaySampling, popoverOpen != open else { return }
         popoverOpen = open
         if open { bluetoothDiscoveryDone = false; fansDiscoveryDone = false }
         start(open: open)
     }
     private(set) var popoverOpen = false
     func restartTimer() { start(open: popoverOpen) }
-    func stop() { timer?.cancel(); timer = nil }
+    func stop() { timer?.cancel(); timer = nil; overlayTask?.cancel(); overlayTask = nil }
+    func beginOverlaySampling(metrics: [String], interval: Double) {
+        overlaySampling = true
+        timer?.cancel(); timer = nil
+        overlayTask?.cancel()
+        overlayTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled && self.overlaySampling {
+                self.sampleOverlay(metrics: metrics)
+                try? await Task.sleep(for: .seconds(max(0.5, interval)))
+            }
+        }
+    }
+    func pauseOverlaySampling() {
+        overlayTask?.cancel(); overlayTask = nil
+    }
+    func endOverlaySampling(reopen: Bool) {
+        overlaySampling = false
+        overlayTask?.cancel(); overlayTask = nil
+        start(open: reopen)
+    }
+    private func sampleOverlay(metrics: [String]) {
+        let now = Date(); chartIndex += 1; overlayTick += 1
+        let selected = Set(metrics)
+        if !selected.isDisjoint(with: ["Battery %", "Battery W", "Time remaining"]) {
+            let started = ProcessInfo.processInfo.systemUptime
+            snapshot.battery = BatteryCollector().collect()
+            traceOverlaySample("battery", started)
+            append(TelemetryPoint(id: chartIndex, value: snapshot.battery.watts), to: &batteryPowerHistory)
+        }
+        if selected.contains("Thermal state") {
+            snapshot.cpu.thermalState = ProcessInfo.processInfo.thermalState.rawValue
+        }
+        if selected.contains("CPU %") || selected.contains("CPU power W") || selected.contains("Total power W") {
+            let started = ProcessInfo.processInfo.systemUptime
+            snapshot.cpu = CPUCollector().collect(previous: &cpuPrevious, previousTotal: &cpuTotalPrevious)
+            traceOverlaySample("cpu", started)
+            append(TelemetryPoint(id: chartIndex, value: snapshot.cpu.load.map { $0 * 100 }), to: &cpuHistory)
+        }
+        if selected.contains("GPU %") || selected.contains("GPU power W") || selected.contains("Total power W") {
+            let started = ProcessInfo.processInfo.systemUptime
+            snapshot.gpu = gpuCollector.collect()
+            traceOverlaySample("gpu", started)
+            append(TelemetryPoint(id: chartIndex, value: snapshot.gpu.utilization), to: &gpuHistory)
+        }
+        if !selected.isDisjoint(with: ["CPU power W", "GPU power W", "Total power W"]) { snapshot.power = powerCollector.collect() }
+        if selected.contains("RAM %") {
+            let started = ProcessInfo.processInfo.systemUptime
+            snapshot.memory = memoryCollector.collect()
+            traceOverlaySample("memory", started); snapshot.memory.pressure = memoryPressureMonitor.state
+            append(TelemetryPoint(id: chartIndex, value: snapshot.memory.usedPercent), to: &memoryHistory)
+        }
+        if selected.contains("Network down") || selected.contains("Network up") { snapshot.network = networkCollector.collect() }
+        if selected.contains("Disk read") || selected.contains("Disk write") {
+            snapshot.diskIO = diskIOCollector.collect()
+            append(TelemetryPoint(id: chartIndex, value: snapshot.diskIO.readBytesPerSecond), to: &diskReadHistory)
+            append(TelemetryPoint(id: chartIndex, value: snapshot.diskIO.writeBytesPerSecond), to: &diskWriteHistory)
+        }
+        if (selected.contains("CPU temp") || selected.contains("Hottest temp")), due("OverlayTemperature", every: 3, now: now) {
+            let started = ProcessInfo.processInfo.systemUptime
+            let sensors = hidSensors.collect()
+            traceOverlaySample("temperature", started); let cpuTemps = sensors.filter { $0.group == "CPU/SoC" }.map(\.celsius)
+            snapshot.temperatures = TemperatureReading(sensors: sensors, cpuAverage: cpuTemps.isEmpty ? nil : cpuTemps.reduce(0, +) / Double(cpuTemps.count), cpuMaximum: cpuTemps.max())
+            append(TelemetryPoint(id: chartIndex, value: snapshot.temperatures.cpuMaximum), to: &temperatureHistory)
+        }
+        if selected.contains("Top process"), due("OverlayProcesses", every: 3, now: now) {
+            let started = ProcessInfo.processInfo.systemUptime
+            snapshot.processes = processCollector.collect(sortByMemory: false)
+            traceOverlaySample("process", started)
+        }
+        onMenuLabelUpdate?()
+    }
     func setProcessMemorySort(_ memory: Bool) { processMemorySort = memory; sampleDates.removeValue(forKey: "Processes") }
     func setVisibleSection(_ section: String, visible: Bool) {
         if visible { visibleSections.insert(section); if section == "Bluetooth" { bluetoothDiscoveryDone = false }; if section == "Fans" { fansDiscoveryDone = false } }
@@ -218,6 +293,11 @@ import UserNotifications
         evaluateAlerts(now: now)
         onMenuLabelUpdate?()
     }
+    private func traceOverlaySample(_ domain: String, _ start: TimeInterval) {
+        guard ProcessInfo.processInfo.arguments.contains("--overlay-qa-timing") else { return }
+        print("OVERLAY_SAMPLE \(domain) \((ProcessInfo.processInfo.systemUptime - start) * 1000)ms")
+    }
+
     private func append(_ point: TelemetryPoint, to values: inout [TelemetryPoint]) {
         values.append(point)
         let oldest = chartIndex - historyMinutes * 60
@@ -238,7 +318,7 @@ import UserNotifications
         let units = networkBits ? ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"] : ["B/s", "KB/s", "MB/s", "GB/s"]
         var value = amount; var index = 0
         while value >= base && index < units.count - 1 { value /= base; index += 1 }
-        return DisplayValue.decimal(value, suffix: " \(units[index])")
+        return value.formatted(.number.locale(locale).precision(.fractionLength(1))) + " \(units[index])"
     }
     func value(for metric: String) -> String {
         switch metric {

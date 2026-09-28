@@ -54,3 +54,9 @@ _Screenshot coming soon._
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Overlay HUD
+
+SiliconPulse also has an optional click-through telemetry HUD for games and full-screen apps. Toggle it with **Control–Option–O** or from the status item's right-click menu. Configure metrics, list or bar layout, colors, opacity, sample interval, display, anchor, offsets, and warning thresholds in Settings → Overlay. Use **Move overlay…** to position it; press Return, Escape, or Done to finish. The HUD state and position are saved between launches. Its sampling loop runs only while the HUD is visible and collects the selected metrics.
+
+Overlay metrics are sampled only while the HUD is on screen. The HUD can be positioned with corner, edge-center, and screen-center anchors, or dragged in the temporary Move mode. It defaults to Control–Option–O; Settings includes alternate global shortcut presets. Use the settings preview to see a five-second sample. On macOS, apps using true exclusive fullscreen can cover the HUD; borderless-windowed or windowed-fullscreen modes keep it visible.

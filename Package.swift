@@ -13,7 +13,8 @@ let package = Package(
             resources: [.copy("Resources")],
             linkerSettings: [
                 .linkedFramework("IOKit"), .linkedFramework("CoreWLAN"),
-                .linkedFramework("Charts"), .linkedFramework("ServiceManagement")
+                .linkedFramework("Charts"), .linkedFramework("ServiceManagement"),
+                .linkedFramework("Carbon")
             ]
         ),
         .testTarget(name: "SiliconPulseTests", dependencies: ["SiliconPulse"], path: "Tests")

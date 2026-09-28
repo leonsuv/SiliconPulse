@@ -13,6 +13,7 @@ import AppKit
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var panelController: PanelController!
+    private var overlayController: OverlayController!
     private var menuTimer: Timer?
     private var rightClickRecognizer: NSClickGestureRecognizer?
 
@@ -21,6 +22,7 @@ import AppKit
         let model = AppModel.shared
         model.snapshot.system = SystemCollector().collect()
         panelController = PanelController(model: model)
+        overlayController = OverlayController(model: model, panelController: panelController)
         model.onMenuLabelUpdate = { [weak self] in self?.updateStatusLabel() }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
@@ -38,7 +40,8 @@ import AppKit
             Task { @MainActor in self?.updateStatusLabel() }
         }
         menuTimer?.tolerance = 1
-        if (UserDefaults.standard.object(forKey: "reopenPinnedAtLaunch") as? Bool ?? true), panelController.isPinned {
+        if overlayController.isActive { overlayController.restoreOnLaunch() }
+        else if (UserDefaults.standard.object(forKey: "reopenPinnedAtLaunch") as? Bool ?? true), panelController.isPinned {
             panelController.show()
         }
         let args = ProcessInfo.processInfo.arguments
@@ -62,10 +65,28 @@ import AppKit
                 self?.panelController.panel.logPinState("settings-open")
             }
         }
+        if args.contains("--overlay-qa-render") {
+            overlayController.activate()
+            model.beginOverlaySampling(metrics: ["CPU %", "GPU %", "RAM %", "Battery %", "Battery W", "CPU temp"], interval: 1)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                guard let self else { return }
+                for window in NSApp.windows where window !== self.overlayController.panel && window !== self.panelController.panel { window.orderOut(nil) }
+                OverlayRenderQA.render(model: model, controller: self.overlayController)
+                NSApp.terminate(nil)
+            }
+        }
+        if args.contains("--overlay-qa-live") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                guard let self else { return }
+                for window in NSApp.windows where window !== self.overlayController.panel && window !== self.panelController.panel {
+                    window.orderOut(nil)
+                }
+            }
+        }
     }
     func applicationWillTerminate(_ notification: Notification) { panelController.persistFrame() }
 
-    @objc private func togglePanel() { panelController.toggle() }
+    @objc private func togglePanel() { if overlayController.isActive { overlayController.deactivate() } else { panelController.toggle() } }
 
     @objc private func showContextMenu(_ recognizer: NSClickGestureRecognizer) {
         guard recognizer.state == .ended else { return }
@@ -85,6 +106,8 @@ import AppKit
     }
 
     @objc private func togglePin() { panelController.setPinned(!panelController.isPinned) }
+    @objc private func toggleOverlay() { overlayController.toggle() }
+    @objc private func moveOverlay() { overlayController.beginMoveMode() }
     @objc private func openSettings() {
         NSApplication.shared.activate(ignoringOtherApps: true)
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)

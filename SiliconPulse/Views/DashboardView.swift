@@ -24,6 +24,10 @@ struct DashboardView: View {
                 Text("SiliconPulse").font(.headline).foregroundStyle(.primary)
                 if panelController.editMode { Text("Edit Mode").font(.caption).foregroundStyle(.secondary) }
                 Spacer(minLength: 4)
+                Button { OverlayController.active?.toggle() } label: {
+                    Image(systemName: OverlayController.active?.isActive == true ? "rectangle.dashed.badge.record" : "rectangle.dashed")
+                        .foregroundStyle(OverlayController.active?.isActive == true ? Color.accentColor : Color.primary)
+                }.buttonStyle(.plain).frame(width: 28, height: 28).help(Text(OverlayL10n.text("Overlay mode", locale: model.locale))).accessibilityLabel(OverlayL10n.text("Overlay mode", locale: model.locale))
                 Button { panelController.setPinned(!panelController.isPinned) } label: {
                     Image(systemName: panelController.isPinned ? "pin.fill" : "pin")
                         .foregroundStyle(panelController.isPinned ? Color.accentColor : Color.primary)

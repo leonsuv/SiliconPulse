@@ -164,8 +164,89 @@ struct SettingsView: View {
                     Text("MIT License · Private telemetry interfaces: IOReport and AppleSMC sensor access.").font(.caption).foregroundStyle(.secondary)
                 }
             }.formStyle(.grouped).tabItem { Label("Advanced", systemImage: "gearshape.2") }
+
+            overlaySettings
         }.padding(8).frame(minWidth: 650, minHeight: 520).navigationTitle("SiliconPulse Settings")
             .environment(\.locale, model.locale)
+    }
+
+
+    private var overlaySettings: some View {
+        @Bindable var preferences = OverlayPreferences.shared
+        let controller = OverlayController.active
+        return Form {
+            Section("Overlay mode") {
+                Toggle("Enable telemetry overlay", isOn: Binding(get: { controller?.isActive ?? UserDefaults.standard.bool(forKey: "overlay.active") }, set: { enabled in
+                    if enabled { controller?.activate() } else { controller?.deactivate() }
+                }))
+                Picker("Global shortcut", selection: $preferences.hotKey) {
+                    Text("Control–Option–O").tag("⌃⌥O"); Text("Control–Option–Command–O").tag("⌃⌥⌘O")
+                    Text("Control–Option–P").tag("⌃⌥P"); Text("Control–Option–H").tag("⌃⌥H")
+                }.onChange(of: preferences.hotKey) { _, _ in controller?.preferencesChanged() }
+                Text("The shortcut toggles the click-through HUD without changing dashboard pin state.").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Metrics and layout") {
+                Picker("Layout", selection: $preferences.layout) { Text("Vertical list").tag("List"); Text("Horizontal bar").tag("Bar") }
+                    .onChange(of: preferences.layout) { _, _ in controller?.preferencesChanged() }
+                ForEach(Array(preferences.metrics.enumerated()), id: \.element) { index, metric in
+                    HStack {
+                        Toggle(isOn: Binding(get: { preferences.metrics.contains(metric) }, set: { enabled in
+                            var values = preferences.metrics
+                            if enabled { if !values.contains(metric) { values.append(metric) } } else { values.removeAll { $0 == metric } }
+                            controller?.setMetrics(values); if controller == nil { preferences.metrics = values }
+                        })) { Label(overlaySettingMetricLabel(metric), systemImage: overlaySymbol(metric)) }
+                        Button { var values = preferences.metrics; guard index > 0 else { return }; values.swapAt(index, index - 1); controller?.setMetrics(values); if controller == nil { preferences.metrics = values } } label: { Image(systemName: "chevron.up") }.buttonStyle(.plain).disabled(index == 0)
+                        Button { var values = preferences.metrics; guard index + 1 < values.count else { return }; values.swapAt(index, index + 1); controller?.setMetrics(values); if controller == nil { preferences.metrics = values } } label: { Image(systemName: "chevron.down") }.buttonStyle(.plain).disabled(index == preferences.metrics.count - 1)
+                    }.onDrag { preferences.draggedMetric = metric; return NSItemProvider(object: metric as NSString) }
+                        .onDrop(of: [UTType.plainText], delegate: OverlayMetricDropDelegate(metric: metric, preferences: preferences, controller: controller))
+                }
+                ForEach(OverlayPreferences.allMetrics.filter { !preferences.metrics.contains($0) }, id: \.self) { metric in
+                    Toggle(isOn: Binding(get: { false }, set: { enabled in if enabled { var values = preferences.metrics; values.append(metric); controller?.setMetrics(values); if controller == nil { preferences.metrics = values } } })) { Label(overlaySettingMetricLabel(metric), systemImage: overlaySymbol(metric)) }
+                }
+                Toggle("Show metric names", isOn: $preferences.showLabels)
+                Toggle("Show 30-second sparklines", isOn: $preferences.showSparklines)
+                Toggle("Compact rows", isOn: $preferences.compact)
+            }
+            Section("Appearance") {
+                Picker("Background", selection: $preferences.background) { Text("None").tag("None"); Text("Subtle dark pill").tag("Subtle dark pill"); Text("Blurred material").tag("Material") }
+                LabeledContent("Background opacity") { Slider(value: $preferences.opacity, in: 0.1...1).frame(width: 180) }
+                LabeledContent("Text opacity") { Slider(value: $preferences.textOpacity, in: 0.3...1).frame(width: 180) }
+                LabeledContent("Corner radius") { Slider(value: $preferences.cornerRadius, in: 0...28).frame(width: 180) }
+                LabeledContent("Text scale") { Slider(value: $preferences.scale, in: 0.8...1.6).frame(width: 180) }.onChange(of: preferences.scale) { _, _ in controller?.preferencesChanged() }
+                LabeledContent("Sample interval") { Picker("Sample interval", selection: $preferences.refresh) { Text("0.5 s").tag(0.5); Text("1 s").tag(1.0); Text("2 s").tag(2.0); Text("5 s").tag(5.0) }.labelsHidden() }
+                Toggle("Color values by thresholds", isOn: $preferences.colorsEnabled)
+                HStack { TextField("CPU warning %", value: $preferences.cpuWarning, format: .number); TextField("GPU warning %", value: $preferences.gpuWarning, format: .number) }
+                HStack { TextField("RAM warning %", value: $preferences.ramWarning, format: .number); TextField("Temperature warning °C", value: $preferences.temperatureWarning, format: .number) }
+                HStack { TextField("Battery red below %", value: $preferences.batteryRed, format: .number); TextField("Battery orange below %", value: $preferences.batteryOrange, format: .number) }
+                Toggle("Show hint on enter", isOn: $preferences.hint)
+                Toggle("Hide when CPU and GPU are idle", isOn: $preferences.autoHide)
+                Toggle("Hide from screen capture", isOn: $preferences.screenshotMode).onChange(of: preferences.screenshotMode) { _, _ in controller?.preferencesChanged() }
+            }
+            Section("Position and display") {
+                Picker("Anchor", selection: $preferences.anchor) { Text("Top left").tag("Top left"); Text("Top center").tag("Top center"); Text("Top right").tag("Top right"); Text("Bottom left").tag("Bottom left"); Text("Bottom center").tag("Bottom center"); Text("Bottom right").tag("Bottom right"); Text("Left center").tag("Left center"); Text("Right center").tag("Right center") }
+                    .onChange(of: preferences.anchor) { _, _ in controller?.preferencesChanged() }
+                Toggle("Follow display under pointer", isOn: $preferences.followActiveDisplay).onChange(of: preferences.followActiveDisplay) { _, _ in controller?.preferencesChanged() }
+                Picker("Saved display", selection: $preferences.displayName) { Text("Main").tag("Main"); ForEach(NSScreen.screens, id: \.localizedName) { Text($0.localizedName).tag($0.localizedName) } }.onChange(of: preferences.displayName) { _, _ in controller?.preferencesChanged() }
+                HStack { TextField("Horizontal offset", value: $preferences.offsetX, format: .number); TextField("Vertical offset", value: $preferences.offsetY, format: .number) }
+                    .onChange(of: preferences.offsetX) { _, _ in controller?.preferencesChanged() }.onChange(of: preferences.offsetY) { _, _ in controller?.preferencesChanged() }
+                Button("Move overlay…") { controller?.beginMoveMode() }
+                Button("Preview for 5 seconds") { controller?.preview() }
+                Text("Move mode accepts a drag. Press Return, Escape, or Done; it ends after 30 seconds of inactivity.").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Preview") {
+                HStack { Image(systemName: "cpu"); Text("CPU %"); Spacer(); Text(model.value(for: "CPU %")) }
+                    .padding(12).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                Text("Metrics without available hardware support display n/a.").font(.caption).foregroundStyle(.secondary)
+            }
+        }.formStyle(.grouped).tabItem { Label("Overlay", systemImage: "rectangle.inset.filled") }
+    }
+
+    private func overlaySettingMetricLabel(_ metric: String) -> String {
+        let key = switch metric { case "Battery %": "Battery"; case "Battery W": "Battery power"; case "CPU temp": "CPU temperature"; default: metric }
+        return OverlayL10n.text(key, locale: model.locale)
+    }
+    private func overlaySymbol(_ metric: String) -> String {
+        switch metric { case "CPU %", "CPU power W", "CPU temp", "Hottest temp": "cpu"; case "GPU %", "GPU power W": "display"; case "RAM %": "memorychip"; case "Battery %", "Battery W", "Time remaining": "battery.100percent"; case "Network down": "arrow.down"; case "Network up": "arrow.up"; case "Disk read": "arrow.down.to.line"; case "Disk write": "arrow.up.to.line"; default: "waveform.path.ecg" }
     }
 
     private func preference(_ key: String, default fallback: Bool) -> Binding<Bool> {
@@ -221,4 +302,20 @@ private struct MenuMetricDropDelegate: DropDelegate {
         }
     }
     func performDrop(info: DropInfo) -> Bool { true }
+}
+
+private struct OverlayMetricDropDelegate: DropDelegate {
+    let metric: String
+    let preferences: OverlayPreferences
+    let controller: OverlayController?
+    func dropEntered(info: DropInfo) {
+        guard let source = preferences.draggedMetric, source != metric,
+              let from = preferences.metrics.firstIndex(of: source), let to = preferences.metrics.firstIndex(of: metric) else { return }
+        var reordered = preferences.metrics
+        reordered.remove(at: from)
+        reordered.insert(source, at: to)
+        if let controller { controller.setMetrics(reordered) } else { preferences.metrics = reordered }
+    }
+    func performDrop(info: DropInfo) -> Bool { preferences.draggedMetric = nil; return true }
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
 }
