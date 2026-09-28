@@ -6,6 +6,8 @@ APP="$(pwd)/SiliconPulse.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/SiliconPulse "$APP/Contents/MacOS/SiliconPulse"
 if [ -d .build/release/SiliconPulse_SiliconPulse.bundle ]; then cp -R .build/release/SiliconPulse_SiliconPulse.bundle "$APP/Contents/Resources/"; fi
+cp -R SiliconPulse/Resources/de.lproj "$APP/Contents/Resources/"
+cp -R SiliconPulse/Resources/en.lproj "$APP/Contents/Resources/"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

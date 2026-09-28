@@ -13,6 +13,9 @@ struct CPUCollector {
         let values = Array(UnsafeBufferPointer(start: info, count: Int(count))).map { UInt32(bitPattern: $0) }
         let old = previous; previous = values
         var cores: [CoreUsage] = []
+        let eCount = performanceCoreCounts().e ?? 0
+        var eNumber = 0
+        var pNumber = 0
         for index in 0..<Int(processors) {
             let base = index * Int(CPU_STATE_MAX)
             guard base + 3 < values.count else { continue }
@@ -22,14 +25,11 @@ struct CPUCollector {
             let delta = oldTotal.map { total &- $0 } ?? 0
             let idleDelta = oldIdle.map { values[base + Int(CPU_STATE_IDLE)] &- $0 } ?? 0
             let use = delta > 0 ? Double(delta &- idleDelta) / Double(delta) : 0
-            cores.append(CoreUsage(id: index, percent: max(0, min(1, use)), kind: index >= (pCoreCount() ?? Int(processors)) ? "E" : "P"))
+            let kind = index < eCount ? "E" : "P"
+            if kind == "E" { eNumber += 1 } else { pNumber += 1 }
+            cores.append(CoreUsage(id: index, percent: max(0, min(1, use)), kind: kind, number: kind == "E" ? eNumber : pNumber))
         }
         let load = cores.isEmpty ? nil : cores.map(\.percent).reduce(0, +) / Double(cores.count)
         return CPUReading(cores: cores, load: load, thermalState: ProcessInfo.processInfo.thermalState.rawValue)
-    }
-    private func pCoreCount() -> Int? {
-        var value: Int32 = 0; var size = MemoryLayout<Int32>.size
-        guard sysctlbyname("hw.perflevel0.logicalcpu", &value, &size, nil, 0) == 0, value > 0 else { return nil }
-        return Int(value)
     }
 }

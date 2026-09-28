@@ -39,10 +39,12 @@ struct NetworkCollector {
             freeifaddrs(first)
         }
         let now = Date(); var reading = NetworkReading()
-        if let old = previous, now.timeIntervalSince(old.0) > 0 {
+        if let old = previous {
             let elapsed = now.timeIntervalSince(old.0)
-            reading.upBytesPerSecond = Double(up >= old.1 ? up - old.1 : 0) / elapsed
-            reading.downBytesPerSecond = Double(down >= old.2 ? down - old.2 : 0) / elapsed
+            if elapsed > 0 && elapsed <= 10 {
+                if up >= old.1 { reading.upBytesPerSecond = Double(up - old.1) / elapsed }
+                if down >= old.2 { reading.downBytesPerSecond = Double(down - old.2) / elapsed }
+            }
         }
         previous = (now, up, down)
         if let interface = CWWiFiClient.shared().interface(), interface.powerOn() {
@@ -52,35 +54,47 @@ struct NetworkCollector {
         return reading
     }
 }
-struct ProcessCollector {
-    func collect() -> [ProcessReading] {
-        var pids = [pid_t](repeating: 0, count: 4096)
-        let bytes = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
-        guard bytes > 0 else { return [] }
-        return pids.prefix(Int(bytes)).filter { $0 > 0 }.compactMap { pid in
-            var info = proc_taskinfo()
-            let size = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info, Int32(MemoryLayout<proc_taskinfo>.size))
-            guard size == MemoryLayout<proc_taskinfo>.size else { return nil }
-            let name = proc_name(pid)
-            return ProcessReading(id: pid, name: name.isEmpty ? "Process \(pid)" : name, cpuPercent: Double(info.pti_total_user + info.pti_total_system))
-        }.sorted { $0.cpuPercent > $1.cpuPercent }.prefix(5).map { $0 }
-    }
-    private func proc_name(_ pid: pid_t) -> String {
-        var buffer = [CChar](repeating: 0, count: 256)
-        let n = Darwin.proc_name(pid, &buffer, UInt32(buffer.count))
-        return n > 0 ? String(cString: buffer) : ""
-    }
-}
 struct SystemCollector {
     func collect() -> SystemReading {
         var model: size_t = 0; sysctlbyname("hw.model", nil, &model, nil, 0)
         var bytes = [CChar](repeating: 0, count: Int(model)); if model > 0 { sysctlbyname("hw.model", &bytes, &model, nil, 0) }
         let chip = runSysctl("machdep.cpu.brand_string") ?? runSysctl("hw.optional.arm.FEAT_FlagM")
-        let e = runInt("hw.perflevel0.logicalcpu"), p = runInt("hw.perflevel1.logicalcpu")
+        let counts = performanceCoreCounts()
         let totalMemory = runUInt("hw.memsize")
-        return SystemReading(chip: chip, model: String(cString: bytes), macOS: ProcessInfo.processInfo.operatingSystemVersionString, uptime: ProcessInfo.processInfo.systemUptime, cpuCores: ProcessInfo.processInfo.processorCount, eCores: e, pCores: p, memoryGB: totalMemory.map { Double($0) / 1_073_741_824 })
+        let version = NSDictionary(contentsOfFile: "/System/Library/CoreServices/SystemVersion.plist") as? [String: Any]
+        let build = version?["ProductBuildVersion"] as? String
+        var boot = timeval()
+        var bootSize = MemoryLayout<timeval>.size
+        let bootDate: Date? = sysctlbyname("kern.boottime", &boot, &bootSize, nil, 0) == 0 ? Date(timeIntervalSince1970: TimeInterval(boot.tv_sec) + TimeInterval(boot.tv_usec) / 1_000_000) : nil
+        return SystemReading(chip: chip, model: String(cString: bytes), macOS: ProcessInfo.processInfo.operatingSystemVersionString, build: build, uptime: ProcessInfo.processInfo.systemUptime, bootTime: bootDate, cpuCores: ProcessInfo.processInfo.processorCount, eCores: counts.e, pCores: counts.p, gpuCores: GPUCollector().collect().coreCount, memoryGB: totalMemory.map { Double($0) / 1_073_741_824 })
     }
     private func runSysctl(_ name: String) -> String? { var value = [CChar](repeating: 0, count: 256); var size = value.count; guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }; return String(cString: value) }
     private func runInt(_ name: String) -> Int? { var v: Int32 = 0; var n = MemoryLayout<Int32>.size; return sysctlbyname(name, &v, &n, nil, 0) == 0 ? Int(v) : nil }
     private func runUInt(_ name: String) -> UInt64? { var v: UInt64 = 0; var n = MemoryLayout<UInt64>.size; return sysctlbyname(name, &v, &n, nil, 0) == 0 ? v : nil }
+}
+
+func performanceCoreCounts() -> (e: Int?, p: Int?) {
+    var efficiency: Int?
+    var performance: Int?
+    for level in 0...7 {
+        guard let name = sysctlString("hw.perflevel\(level).name"),
+              let count = sysctlInteger("hw.perflevel\(level).logicalcpu") else { continue }
+        let lower = name.lowercased()
+        if lower.contains("efficiency") { efficiency = count }
+        else if lower.contains("performance") { performance = count }
+    }
+    return (efficiency, performance)
+}
+
+private func sysctlString(_ name: String) -> String? {
+    var value = [CChar](repeating: 0, count: 128)
+    var size = value.count
+    guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
+    return String(cString: value)
+}
+private func sysctlInteger(_ name: String) -> Int? {
+    var value: Int32 = 0
+    var size = MemoryLayout<Int32>.size
+    guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
+    return Int(value)
 }
