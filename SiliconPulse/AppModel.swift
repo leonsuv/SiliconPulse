@@ -5,6 +5,7 @@ import AppKit
 import UserNotifications
 
 @MainActor @Observable final class AppModel {
+    static let shared = AppModel()
     static let allSections = ["Battery", "Power", "GPU", "CPU", "Memory", "Disk", "Network", "Thermal", "Processes", "Sleep blockers", "System", "Bluetooth", "Fans"]
     static let menuOptions = ["Battery %", "Battery W", "CPU %", "GPU %", "RAM %", "Disk I/O", "Net down", "Net up", "Temperature", "Power W"]
 
@@ -29,7 +30,10 @@ import UserNotifications
     var batteryAlertThreshold = UserDefaults.standard.double(forKey: "batteryAlertThreshold") == 0 ? 20.0 : UserDefaults.standard.double(forKey: "batteryAlertThreshold")
     var cpuAlertThreshold = UserDefaults.standard.double(forKey: "cpuAlertThreshold") == 0 ? 80.0 : UserDefaults.standard.double(forKey: "cpuAlertThreshold")
     var processMemorySort = false
-    var sectionOrder: [String] = UserDefaults.standard.stringArray(forKey: "sectionOrder") ?? AppModel.allSections
+    var sectionOrder: [String] = {
+        let saved = UserDefaults.standard.stringArray(forKey: "sectionOrder") ?? []
+        return saved + AppModel.allSections.filter { !saved.contains($0) }
+    }()
     var visibleSections = Set(UserDefaults.standard.stringArray(forKey: "visibleSections") ?? AppModel.allSections)
     var expanded: Set<String> = ["Battery", "Power", "GPU", "CPU", "Memory", "Disk", "Network", "Thermal", "Processes", "Sleep blockers"]
 
@@ -45,6 +49,7 @@ import UserNotifications
     private var highCPUStart: Date?
     private var lastAlerts: [String: Date] = [:]
     private var latencyCollector = NetworkLatencyProbe()
+    var onMenuLabelUpdate: (() -> Void)?
 
     func start(open: Bool) {
         popoverOpen = open
@@ -110,6 +115,7 @@ import UserNotifications
             default: break
             }
         }
+        onMenuLabelUpdate?()
     }
     private func samplePopover() async {
         let now = Date(); chartIndex += 1
@@ -162,6 +168,7 @@ import UserNotifications
         }
         if expanded.contains("System"), due("System", every: 5, now: now) { snapshot.system = SystemCollector().collect() }
         evaluateAlerts(now: now)
+        onMenuLabelUpdate?()
     }
     private func append(_ point: TelemetryPoint, to values: inout [TelemetryPoint]) {
         values.append(point)

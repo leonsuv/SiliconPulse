@@ -4,18 +4,28 @@ import AppKit
 
 struct DashboardView: View {
     @Environment(AppModel.self) private var model
+    let panelController: PanelController
+    let onSettings: () -> Void
     private var cards: [String] {
         model.sectionOrder.filter { model.visibleSections.contains($0) && (($0 != "Bluetooth" || !model.snapshot.bluetooth.isEmpty) && ($0 != "Fans" || !model.snapshot.fans.isEmpty)) }
     }
 
     var body: some View {
-        let maximumHeight = (NSScreen.main?.visibleFrame.height ?? 800) * 0.8
         return VStack(spacing: 0) {
             HStack {
                 Image(systemName: "waveform.path.ecg").foregroundStyle(.primary)
                 Text("SiliconPulse").font(.headline).foregroundStyle(.primary)
                 Spacer()
-                Button { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) } label: {
+                Button { panelController.setPinned(!panelController.pinned) } label: {
+                    Image(systemName: panelController.pinned ? "pin.fill" : "pin")
+                        .foregroundStyle(panelController.pinned ? Color.accentColor : Color.primary)
+                }.buttonStyle(.plain).help(panelController.pinned ? Text("Unpin panel") : Text("Pin panel"))
+                    .accessibilityLabel(panelController.pinned ? "Unpin panel" : "Pin panel")
+                Button { panelController.editMode.toggle() } label: {
+                    Image(systemName: panelController.editMode ? "checkmark" : "pencil").foregroundStyle(.primary)
+                }.buttonStyle(.plain).help(panelController.editMode ? Text("Done editing") : Text("Edit cards"))
+                    .accessibilityLabel(panelController.editMode ? "Done editing" : "Edit cards")
+                Button(action: onSettings) {
                     Image(systemName: "gearshape").foregroundStyle(.primary)
                 }.buttonStyle(.plain).help(Text("Settings"))
             }.padding(.horizontal, 16).padding(.vertical, 8)
@@ -30,8 +40,10 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 8) {
                     ForEach(cards, id: \.self) { title in CardView(title: title) }
-                }.frame(width: 340, alignment: .top).padding(10)
-            }.clipped()
+                }.frame(maxWidth: .infinity, alignment: .top).padding(10)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
 
             HStack {
                 Text(model.snapshot.system.chip ?? "Apple Silicon")
@@ -41,9 +53,9 @@ struct DashboardView: View {
                 Button("Quit") { NSApplication.shared.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
             }.font(.caption2).foregroundStyle(.secondary).padding(10)
         }
-        .frame(width: 380).frame(maxHeight: maximumHeight)
+        .frame(minWidth: 300, idealWidth: 380, maxWidth: .infinity, minHeight: 260, maxHeight: .infinity)
         .background(.regularMaterial)
-        .overlay { PopoverWindowObserver { model.setPopoverOpen($0) }.frame(width: 0, height: 0) }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
