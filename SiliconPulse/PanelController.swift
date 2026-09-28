@@ -31,14 +31,19 @@ import Observation
 }
 
 @MainActor @Observable final class PanelController {
+    static weak var active: PanelController?
+    static var sharedPinned: Bool { active?.pinned ?? false }
     let model: AppModel
     private(set) var pinned = UserDefaults.standard.bool(forKey: "panelPinned")
     var editMode = false
+    var resizeStartSize: CGSize?
+    var showLayoutResetConfirmation = false
     var panel: ManagedPanel!
     private weak var statusButton: NSStatusBarButton?
 
     init(model: AppModel) {
         self.model = model
+        Self.active = self
         let screen = NSScreen.main ?? NSScreen.screens[0]
         let width = max(300, UserDefaults.standard.double(forKey: "panelWidth").nonzeroOr(380))
         let height = min(screen.visibleFrame.height * 0.8, 640)
@@ -54,7 +59,7 @@ import Observation
         panel.maxSize = NSSize(width: 700, height: screen.visibleFrame.height)
         panel.isPinned = pinned
         let root = DashboardView(panelController: self, onSettings: { [weak self] in self?.openSettings() })
-            .environment(model)
+            .environment(model).environment(\.locale, model.locale)
         panel.contentView = NSHostingView(rootView: root)
         panel.observeOcclusion()
         panel.visibilityChanged = { [weak model] visible in model?.setPopoverOpen(visible) }
@@ -99,6 +104,13 @@ import Observation
         frame.size.width = min(700, max(300, width))
         panel.setFrame(frame, display: true)
         UserDefaults.standard.set(Double(frame.width), forKey: "panelWidth")
+    }
+    func resizePanel(width: CGFloat, height: CGFloat) {
+        guard pinned else { return }
+        var frame = panel.frame
+        frame.size.width = min(700, max(300, width))
+        frame.size.height = min((panel.screen ?? NSScreen.main)?.visibleFrame.height ?? 1000, max(260, height))
+        panel.setFrame(frame, display: true)
     }
 
     private func panelPinnedSave(_ value: Bool) { UserDefaults.standard.set(value, forKey: "panelPinned") }

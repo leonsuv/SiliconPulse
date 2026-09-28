@@ -6,7 +6,7 @@ import AppKit
     private let model = AppModel.shared
 
     var body: some Scene {
-        Settings { SettingsView().environment(model).frame(minWidth: 620, minHeight: 520) }
+        Settings { SettingsView().environment(model).environment(\.locale, model.locale).frame(minWidth: 620, minHeight: 520) }
     }
 }
 
@@ -58,9 +58,7 @@ import AppKit
         let quit = NSMenuItem(title: "Quit SiliconPulse", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-        statusItem.menu = nil
+        if let button = statusItem.button { menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY), in: button) }
     }
 
     @objc private func togglePin() { panelController.setPinned(!panelController.pinned) }
@@ -74,12 +72,13 @@ import AppKit
         let metrics = AppModel.shared.menuMetrics
         let button = statusItem.button
         let iconName = metrics.first.map { AppModel.shared.menuSymbol(for: $0) } ?? "waveform.path.ecg"
-        button?.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "SiliconPulse")
+        button?.image = AppModel.shared.showMenuIcons ? NSImage(systemSymbolName: iconName, accessibilityDescription: "SiliconPulse") : nil
         let parts = metrics.map { metric -> String in
-            let value = AppModel.shared.value(for: metric)
+            let value = String(AppModel.shared.value(for: metric).prefix(9)).padding(toLength: 9, withPad: " ", startingAt: 0)
             return "\(metric == "Battery %" ? "" : "\(metric.replacingOccurrences(of: " %", with: "")) ")\(value)"
         }
-        let text = parts.isEmpty ? "SiliconPulse" : parts.joined(separator: "  ·  ")
+        let separator: String = switch AppModel.shared.menuSeparator { case "Bar": "  |  "; case "Space": "     "; default: "  ·  " }
+        let text = parts.isEmpty ? "SiliconPulse" : parts.joined(separator: separator)
         button?.attributedTitle = NSAttributedString(string: text, attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])
         button?.toolTip = metrics.map { "\($0): \(AppModel.shared.value(for: $0))" }.joined(separator: "\n")
     }

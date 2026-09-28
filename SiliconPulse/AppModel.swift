@@ -17,7 +17,15 @@ import UserNotifications
     var temperatureHistory: [TelemetryPoint] = []; var thermalTimeline: [Int] = []
 
     var menuMetrics: [String] = UserDefaults.standard.stringArray(forKey: "menuMetrics") ?? ["Battery %"] {
-        didSet { UserDefaults.standard.set(menuMetrics, forKey: "menuMetrics") }
+        didSet { UserDefaults.standard.set(menuMetrics, forKey: "menuMetrics"); onMenuLabelUpdate?() }
+    }
+    var language = UserDefaults.standard.string(forKey: "appLanguage") ?? "System" { didSet { UserDefaults.standard.set(language, forKey: "appLanguage") } }
+    var locale: Locale { Locale(identifier: language == "System" ? Locale.current.identifier : language) }
+    var enableHIDTemps = UserDefaults.standard.object(forKey: "enableHIDTemps") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(enableHIDTemps, forKey: "enableHIDTemps"); if !enableHIDTemps { snapshot.temperatures = TemperatureReading() } }
+    }
+    var enableSMCFans = UserDefaults.standard.object(forKey: "enableSMCFans") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(enableSMCFans, forKey: "enableSMCFans"); if !enableSMCFans { snapshot.fans = [] } else { fansDiscoveryDone = false } }
     }
     var refreshSeconds = UserDefaults.standard.double(forKey: "refreshSeconds") == 0 ? 1.0 : UserDefaults.standard.double(forKey: "refreshSeconds")
     var fahrenheit = UserDefaults.standard.bool(forKey: "fahrenheit")
@@ -25,17 +33,27 @@ import UserNotifications
     var decimalUnits = UserDefaults.standard.bool(forKey: "decimalUnits")
     var historyMinutes = UserDefaults.standard.integer(forKey: "historyMinutes") == 0 ? 1 : UserDefaults.standard.integer(forKey: "historyMinutes")
     var compactRows = UserDefaults.standard.bool(forKey: "compactRows")
+    var panelOpacity: Double = UserDefaults.standard.object(forKey: "panelOpacity") as? Double ?? 0.94 { didSet { UserDefaults.standard.set(panelOpacity, forKey: "panelOpacity") } }
+    var showDockIcon = UserDefaults.standard.bool(forKey: "showDockIcon") {
+        didSet { UserDefaults.standard.set(showDockIcon, forKey: "showDockIcon"); NSApplication.shared.setActivationPolicy(showDockIcon ? .regular : .accessory) }
+    }
+    var reopenPinnedAtLaunch: Bool = UserDefaults.standard.object(forKey: "reopenPinnedAtLaunch") as? Bool ?? true { didSet { UserDefaults.standard.set(reopenPinnedAtLaunch, forKey: "reopenPinnedAtLaunch") } }
+    var showMenuIcons = UserDefaults.standard.object(forKey: "showMenuIcons") as? Bool ?? true { didSet { UserDefaults.standard.set(showMenuIcons, forKey: "showMenuIcons") } }
+    var menuSeparator = UserDefaults.standard.string(forKey: "menuSeparator") ?? "Dot" { didSet { UserDefaults.standard.set(menuSeparator, forKey: "menuSeparator") } }
+    var use24HourTime = UserDefaults.standard.bool(forKey: "use24HourTime") { didSet { UserDefaults.standard.set(use24HourTime, forKey: "use24HourTime") } }
     var latencyProbeEnabled = UserDefaults.standard.bool(forKey: "latencyProbeEnabled")
     var alertsEnabled = UserDefaults.standard.bool(forKey: "alertsEnabled")
     var batteryAlertThreshold = UserDefaults.standard.double(forKey: "batteryAlertThreshold") == 0 ? 20.0 : UserDefaults.standard.double(forKey: "batteryAlertThreshold")
     var cpuAlertThreshold = UserDefaults.standard.double(forKey: "cpuAlertThreshold") == 0 ? 80.0 : UserDefaults.standard.double(forKey: "cpuAlertThreshold")
     var processMemorySort = false
+    var showSettingsResetConfirmation = false
+    var settingsMessage = ""
     var sectionOrder: [String] = {
         let saved = UserDefaults.standard.stringArray(forKey: "sectionOrder") ?? []
         return saved + AppModel.allSections.filter { !saved.contains($0) }
-    }()
-    var visibleSections = Set(UserDefaults.standard.stringArray(forKey: "visibleSections") ?? AppModel.allSections)
-    var expanded: Set<String> = ["Battery", "Power", "GPU", "CPU", "Memory", "Disk", "Network", "Thermal", "Processes", "Sleep blockers"]
+    }() { didSet { UserDefaults.standard.set(sectionOrder, forKey: "sectionOrder") } }
+    var visibleSections = Set(UserDefaults.standard.stringArray(forKey: "visibleSections") ?? AppModel.allSections) { didSet { UserDefaults.standard.set(Array(visibleSections), forKey: "visibleSections") } }
+    var expanded: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "expandedSections") ?? ["Battery", "Power", "GPU", "CPU", "Memory", "Disk", "Network", "Thermal", "Processes", "Sleep blockers"]) { didSet { UserDefaults.standard.set(Array(expanded), forKey: "expandedSections") } }
 
     private var cpuPrevious: [UInt32]?; private var cpuTotalPrevious: [UInt32]?
     private var networkCollector = NetworkCollector(); private var powerCollector = PowerCollector()
@@ -86,6 +104,33 @@ import UserNotifications
         sectionOrder = updated
         UserDefaults.standard.set(updated, forKey: "sectionOrder")
     }
+    func moveSection(_ section: String, by offset: Int) {
+        guard let index = sectionOrder.firstIndex(of: section) else { return }
+        let target = index + offset
+        guard sectionOrder.indices.contains(target) else { return }
+        sectionOrder.swapAt(index, target)
+    }
+    func moveSection(_ section: String, before destination: String) {
+        guard section != destination, let source = sectionOrder.firstIndex(of: section), let target = sectionOrder.firstIndex(of: destination) else { return }
+        sectionOrder.remove(at: source)
+        sectionOrder.insert(section, at: min(target > source ? target - 1 : target, sectionOrder.count))
+    }
+    func moveMenuMetric(_ metric: String, by offset: Int) {
+        guard let index = menuMetrics.firstIndex(of: metric) else { return }
+        let target = index + offset
+        guard menuMetrics.indices.contains(target) else { return }
+        menuMetrics.swapAt(index, target)
+    }
+    func moveMenuMetric(_ metric: String, before destination: String) {
+        guard metric != destination, let source = menuMetrics.firstIndex(of: metric), let target = menuMetrics.firstIndex(of: destination) else { return }
+        menuMetrics.remove(at: source)
+        menuMetrics.insert(metric, at: min(target > source ? target - 1 : target, menuMetrics.count))
+    }
+    func resetLayout() {
+        sectionOrder = AppModel.allSections
+        visibleSections = Set(AppModel.allSections)
+        expanded = Set(["Battery", "Power", "GPU", "CPU", "Memory", "Disk", "Network", "Thermal", "Processes", "Sleep blockers"])
+    }
     func setAlertsEnabled(_ value: Bool) {
         alertsEnabled = value
         UserDefaults.standard.set(value, forKey: "alertsEnabled")
@@ -119,54 +164,57 @@ import UserNotifications
     }
     private func samplePopover() async {
         let now = Date(); chartIndex += 1
-        if due("Battery", every: 1, now: now) {
+        if (visibleSections.contains("Battery") || menuMetrics.contains("Battery %") || menuMetrics.contains("Battery W")), due("Battery", every: 1, now: now) {
             snapshot.battery = BatteryCollector().collect()
             if snapshot.battery.temperatureC == nil, let fallback = snapshot.temperatures.sensors.first(where: { $0.group == "Battery" })?.celsius { snapshot.battery.temperatureC = fallback }
             append(TelemetryPoint(id: chartIndex, value: snapshot.battery.watts), to: &batteryPowerHistory)
         }
-        if expanded.contains("Power"), due("Power", every: 1, now: now) {
+        if visibleSections.contains("Power"), expanded.contains("Power"), due("Power", every: 1, now: now) {
             snapshot.power = powerCollector.collect(); append(TelemetryPoint(id: chartIndex, value: snapshot.power.combined), to: &powerHistory)
         }
-        if due("CPU", every: 1, now: now) {
+        if visibleSections.contains("CPU"), due("CPU", every: 1, now: now) {
             snapshot.cpu = CPUCollector().collect(previous: &cpuPrevious, previousTotal: &cpuTotalPrevious)
             append(TelemetryPoint(id: chartIndex, value: snapshot.cpu.load.map { $0 * 100 }), to: &cpuHistory)
         }
-        if due("GPU", every: 1, now: now) {
+        if visibleSections.contains("GPU"), due("GPU", every: 1, now: now) {
             snapshot.gpu = gpuCollector.collect(); append(TelemetryPoint(id: chartIndex, value: snapshot.gpu.utilization), to: &gpuHistory)
         }
-        if due("Memory", every: 2, now: now) {
+        if visibleSections.contains("Memory"), due("Memory", every: 2, now: now) {
             snapshot.memory = memoryCollector.collect(); snapshot.memory.pressure = memoryPressureMonitor.state; append(TelemetryPoint(id: chartIndex, value: snapshot.memory.usedPercent), to: &memoryHistory)
         }
-        if expanded.contains("Disk"), due("Disk", every: 2, now: now) {
+        if visibleSections.contains("Disk"), expanded.contains("Disk"), due("Disk", every: 2, now: now) {
             snapshot.disk = DiskCollector().collect(); snapshot.diskIO = diskIOCollector.collect()
             if due("SMART", every: 60, now: now) { snapshot.disk.smartStatus = await Task.detached(priority: .utility) { DiskCollector.smartStatus() }.value }
             append(TelemetryPoint(id: chartIndex, value: snapshot.diskIO.readBytesPerSecond), to: &diskReadHistory)
             append(TelemetryPoint(id: chartIndex, value: snapshot.diskIO.writeBytesPerSecond), to: &diskWriteHistory)
         }
-        if expanded.contains("Network"), due("Network", every: 2, now: now) {
+        if visibleSections.contains("Network"), expanded.contains("Network"), due("Network", every: 2, now: now) {
             snapshot.network = networkCollector.collect()
             append(TelemetryPoint(id: chartIndex, value: snapshot.network.downBytesPerSecond), to: &networkDownHistory)
             append(TelemetryPoint(id: chartIndex, value: snapshot.network.upBytesPerSecond), to: &networkUpHistory)
-            if latencyProbeEnabled, due("Latency", every: 5, now: now) { snapshot.network.latencyMs = await Task.detached(priority: .utility) { NetworkLatencyProbe.measure() }.value }
+            if latencyProbeEnabled, due("Latency", every: 5, now: now) {
+                let host = UserDefaults.standard.string(forKey: "latencyHost") ?? "1.1.1.1"
+                snapshot.network.latencyMs = await Task.detached(priority: .utility) { NetworkLatencyProbe.measure(host: host) }.value
+            }
         }
-        if expanded.contains("Thermal"), due("Thermal", every: 2, now: now) {
+        if visibleSections.contains("Thermal"), expanded.contains("Thermal"), enableHIDTemps, due("Thermal", every: 2, now: now) {
             let sensors = hidSensors.collect(); let cpuTemps = sensors.filter { $0.group == "CPU/SoC" }.map(\.celsius)
             snapshot.temperatures = TemperatureReading(sensors: sensors, cpuAverage: cpuTemps.isEmpty ? nil : cpuTemps.reduce(0, +) / Double(cpuTemps.count), cpuMaximum: cpuTemps.max())
             if snapshot.battery.temperatureC == nil, let batteryTemp = sensors.first(where: { $0.group == "Battery" })?.celsius { snapshot.battery.temperatureC = batteryTemp }
             append(TelemetryPoint(id: chartIndex, value: snapshot.temperatures.cpuMaximum), to: &temperatureHistory)
             thermalTimeline.append(snapshot.cpu.thermalState); if thermalTimeline.count > 150 { thermalTimeline.removeFirst(thermalTimeline.count - 300) }
         }
-        if expanded.contains("Processes"), due("Processes", every: 3, now: now) { snapshot.processes = processCollector.collect(sortByMemory: processMemorySort) }
-        if expanded.contains("Sleep blockers"), due("Sleep blockers", every: 5, now: now) { snapshot.sleepBlockers = SleepAssertionCollector().collect() }
+        if visibleSections.contains("Processes"), expanded.contains("Processes"), due("Processes", every: 3, now: now) { snapshot.processes = processCollector.collect(sortByMemory: processMemorySort) }
+        if visibleSections.contains("Sleep blockers"), expanded.contains("Sleep blockers"), due("Sleep blockers", every: 5, now: now) { snapshot.sleepBlockers = SleepAssertionCollector().collect() }
         if visibleSections.contains("Bluetooth") {
             if !bluetoothDiscoveryDone { snapshot.bluetooth = bluetoothCollector.collect(); bluetoothDiscoveryDone = true; sampleDates["Bluetooth"] = now }
             else if !snapshot.bluetooth.isEmpty && expanded.contains("Bluetooth"), due("Bluetooth", every: 30, now: now) { snapshot.bluetooth = bluetoothCollector.collect() }
         }
-        if visibleSections.contains("Fans") {
+        if visibleSections.contains("Fans"), enableSMCFans {
             if !fansDiscoveryDone { snapshot.fans = fanCollector.collect(); fansDiscoveryDone = true; sampleDates["Fans"] = now }
             else if !snapshot.fans.isEmpty && expanded.contains("Fans"), due("Fans", every: 30, now: now) { snapshot.fans = fanCollector.collect() }
         }
-        if expanded.contains("System"), due("System", every: 5, now: now) { snapshot.system = SystemCollector().collect() }
+        if visibleSections.contains("System"), expanded.contains("System"), due("System", every: 5, now: now) { snapshot.system = SystemCollector().collect() }
         evaluateAlerts(now: now)
         onMenuLabelUpdate?()
     }
@@ -212,20 +260,43 @@ import UserNotifications
     func copySnapshot() {
         var lines = ["SiliconPulse — \(Date.now.formatted())"]
         lines += ["Battery: \(value(for: "Battery %"))", "Battery power: \(value(for: "Battery W"))", "CPU: \(value(for: "CPU %"))", "GPU: \(value(for: "GPU %"))", "Power: \(value(for: "Power W"))", "Memory: \(formatBytes(snapshot.memory.used))", "Disk I/O: \(value(for: "Disk I/O"))", "Network down/up: \(value(for: "Net down")) / \(value(for: "Net up"))", "Temperature: \(value(for: "Temperature"))", "Thermal state: \(snapshot.cpu.thermalState)"]
+        if UserDefaults.standard.bool(forKey: "copyProcessNames") { lines += snapshot.processes.map { "Process \($0.name): \(DisplayValue.decimal($0.cpuPercent, digits: 0, suffix: "%"))" } }
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
     }
     private func evaluateAlerts(now: Date) {
         guard alertsEnabled else { highCPUStart = nil; return }
-        if let percent = snapshot.battery.percent, percent * 100 < batteryAlertThreshold { notify("battery", title: "Low battery", body: "Battery is below \(Int(batteryAlertThreshold))%.", now: now) }
-        if snapshot.cpu.thermalState >= 2 { notify("thermal", title: "High thermal pressure", body: "Thermal state is serious or critical.", now: now) }
-        if snapshot.processes.contains(where: { $0.cpuPercent >= cpuAlertThreshold }) {
+        if preferenceEnabled("alertBatteryLow", fallback: true), let percent = snapshot.battery.percent, percent * 100 < batteryAlertThreshold { notify("battery", title: "Low battery", body: "Battery is below \(Int(batteryAlertThreshold))%.", now: now) }
+        if preferenceEnabled("alertBatteryFull", fallback: false), snapshot.battery.fullyCharged == true { notify("batteryFull", title: "Battery fully charged", body: "The battery is fully charged.", now: now) }
+        if preferenceEnabled("alertThermal", fallback: true), snapshot.cpu.thermalState >= 2 { notify("thermal", title: "High thermal pressure", body: "Thermal state is serious or critical.", now: now) }
+        if preferenceEnabled("alertCPU", fallback: true), snapshot.processes.contains(where: { $0.cpuPercent >= cpuAlertThreshold }) {
             if highCPUStart == nil { highCPUStart = now }
-            if let since = highCPUStart, now.timeIntervalSince(since) >= 30 { notify("cpu", title: "High process CPU", body: "A process has exceeded the configured CPU threshold for 30 seconds.", now: now) }
+            let duration = UserDefaults.standard.object(forKey: "alertCPUSeconds") as? Int ?? 30
+            if let since = highCPUStart, now.timeIntervalSince(since) >= Double(duration) { notify("cpu", title: "High process CPU", body: "A process has exceeded the configured CPU threshold for \(duration) seconds.", now: now) }
         } else { highCPUStart = nil }
-        if snapshot.disk.smartStatus?.localizedCaseInsensitiveContains("fail") == true { notify("smart", title: "Storage health warning", body: "SMART reports a failing status.", now: now) }
+        if preferenceEnabled("alertMemoryPressure", fallback: false), (snapshot.memory.pressure == "Warning" || snapshot.memory.pressure == "Critical") {
+            notify("memoryPressure", title: "Memory pressure", body: "Memory pressure is \(snapshot.memory.pressure ?? "high").", now: now)
+        }
+        if preferenceEnabled("alertSMART", fallback: true), snapshot.disk.smartStatus?.localizedCaseInsensitiveContains("fail") == true { notify("smart", title: "Storage health warning", body: "SMART reports a failing status.", now: now) }
+        let diskLimit = UserDefaults.standard.object(forKey: "alertDiskGB") as? Double ?? 10
+        if preferenceEnabled("alertDiskLow", fallback: false), let free = snapshot.disk.free, Double(free) < diskLimit * 1_000_000_000 { notify("diskLow", title: "Low disk space", body: "Boot volume free space is below the configured limit.", now: now) }
+        let hotLimit = UserDefaults.standard.object(forKey: "alertTemperatureC") as? Double ?? 90
+        if preferenceEnabled("alertTemperature", fallback: false), let hot = snapshot.temperatures.sensors.map(\.celsius).max(), hot >= hotLimit { notify("hotTemperature", title: "High temperature", body: "A temperature sensor exceeded the configured limit.", now: now) }
+        let bluetoothLimit = UserDefaults.standard.object(forKey: "alertBluetoothPercent") as? Int ?? 15
+        if preferenceEnabled("alertBluetooth", fallback: false), let device = snapshot.bluetooth.first(where: { $0.percent <= bluetoothLimit }) { notify("bluetooth", title: "Bluetooth battery low", body: "\(device.name) is below the configured battery threshold.", now: now) }
     }
+    private func preferenceEnabled(_ key: String, fallback: Bool) -> Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? fallback }
     private func notify(_ id: String, title: String, body: String, now: Date) {
-        guard now.timeIntervalSince(lastAlerts[id] ?? .distantPast) >= 600 else { return }
+        let cooldown = UserDefaults.standard.object(forKey: "alertCooldownMinutes") as? Int ?? 10
+        guard now.timeIntervalSince(lastAlerts[id] ?? .distantPast) >= Double(cooldown * 60) else { return }
+        if let start = UserDefaults.standard.object(forKey: "quietHoursStart") as? Date,
+           let end = UserDefaults.standard.object(forKey: "quietHoursEnd") as? Date {
+            let calendar = Calendar.current
+            let minute = calendar.component(.hour, from: now) * 60 + calendar.component(.minute, from: now)
+            let begin = calendar.component(.hour, from: start) * 60 + calendar.component(.minute, from: start)
+            let finish = calendar.component(.hour, from: end) * 60 + calendar.component(.minute, from: end)
+            let quiet = begin <= finish ? minute >= begin && minute < finish : minute >= begin || minute < finish
+            if quiet { return }
+        }
         lastAlerts[id] = now
         let content = UNMutableNotificationContent(); content.title = title; content.body = body
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "siliconpulse.\(id)", content: content, trigger: nil))

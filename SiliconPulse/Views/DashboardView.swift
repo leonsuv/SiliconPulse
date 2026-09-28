@@ -1,21 +1,29 @@
 import SwiftUI
 import Charts
 import AppKit
+import UniformTypeIdentifiers
 
 struct DashboardView: View {
     @Environment(AppModel.self) private var model
     let panelController: PanelController
     let onSettings: () -> Void
+
     private var cards: [String] {
-        model.sectionOrder.filter { model.visibleSections.contains($0) && (($0 != "Bluetooth" || !model.snapshot.bluetooth.isEmpty) && ($0 != "Fans" || !model.snapshot.fans.isEmpty)) }
+        let ordered = model.sectionOrder.filter { section in
+            (panelController.editMode || section != "Bluetooth" || !model.snapshot.bluetooth.isEmpty) &&
+            (panelController.editMode || section != "Fans" || !model.snapshot.fans.isEmpty)
+        }
+        guard panelController.editMode else { return ordered.filter { model.visibleSections.contains($0) } }
+        return ordered.filter { model.visibleSections.contains($0) } + ordered.filter { !model.visibleSections.contains($0) }
     }
 
     var body: some View {
-        return VStack(spacing: 0) {
-            HStack {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
                 Image(systemName: "waveform.path.ecg").foregroundStyle(.primary)
                 Text("SiliconPulse").font(.headline).foregroundStyle(.primary)
-                Spacer()
+                if panelController.editMode { Text("Edit Mode").font(.caption).foregroundStyle(.secondary) }
+                Spacer(minLength: 4)
                 Button { panelController.setPinned(!panelController.pinned) } label: {
                     Image(systemName: panelController.pinned ? "pin.fill" : "pin")
                         .foregroundStyle(panelController.pinned ? Color.accentColor : Color.primary)
@@ -25,38 +33,83 @@ struct DashboardView: View {
                     Image(systemName: panelController.editMode ? "checkmark" : "pencil").foregroundStyle(.primary)
                 }.buttonStyle(.plain).help(panelController.editMode ? Text("Done editing") : Text("Edit cards"))
                     .accessibilityLabel(panelController.editMode ? "Done editing" : "Edit cards")
-                Button(action: onSettings) {
-                    Image(systemName: "gearshape").foregroundStyle(.primary)
-                }.buttonStyle(.plain).help(Text("Settings"))
-            }.padding(.horizontal, 16).padding(.vertical, 8)
+                Button(action: onSettings) { Image(systemName: "gearshape").foregroundStyle(.primary) }
+                    .buttonStyle(.plain).help(Text("Settings"))
+                if panelController.pinned {
+                    Button { panelController.close() } label: { Image(systemName: "xmark").foregroundStyle(.secondary) }
+                        .buttonStyle(.plain).help(Text("Close panel")).accessibilityLabel("Close panel")
+                }
+            }.padding(.horizontal, 16).padding(.vertical, 10)
 
-            HStack(spacing: 5) {
-                GlanceTile(title: "CPU", value: model.value(for: "CPU %"), points: model.cpuHistory, color: .blue)
-                GlanceTile(title: "GPU", value: model.value(for: "GPU %"), points: model.gpuHistory, color: .teal)
-                GlanceTile(title: "RAM", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple)
-                GlanceTile(title: "Battery W", value: model.value(for: "Battery W"), points: model.batteryPowerHistory, color: .orange)
-            }.padding(.horizontal, 10).padding(.bottom, 8)
+            if !panelController.editMode {
+                HStack(spacing: 5) {
+                    GlanceTile(title: "CPU", value: model.value(for: "CPU %"), points: model.cpuHistory, color: .blue)
+                    GlanceTile(title: "GPU", value: model.value(for: "GPU %"), points: model.gpuHistory, color: .teal)
+                    GlanceTile(title: "RAM", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple)
+                    GlanceTile(title: "Battery W", value: model.value(for: "Battery W"), points: model.batteryPowerHistory, color: .orange)
+                }.padding(.horizontal, 10).padding(.bottom, 8)
+            }
 
             ScrollView {
                 VStack(spacing: 8) {
-                    ForEach(cards, id: \.self) { title in CardView(title: title) }
+                    ForEach(cards, id: \.self) { title in
+                        CardView(title: title, isHidden: !model.visibleSections.contains(title), editMode: panelController.editMode)
+                            .onDrop(of: [UTType.plainText], delegate: SectionDropDelegate(section: title, model: model))
+                    }
+                    if panelController.editMode {
+                        Button("Reset layout…") { panelController.showLayoutResetConfirmation = true }
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8)
+                            .confirmationDialog("Reset card layout?", isPresented: Binding(get: { panelController.showLayoutResetConfirmation }, set: { panelController.showLayoutResetConfirmation = $0 }), titleVisibility: .visible) {
+                                Button("Reset Layout", role: .destructive) { model.resetLayout() }
+                            } message: { Text("Restore the default card order, visibility, and expanded state.") }
+                    }
                 }.frame(maxWidth: .infinity, alignment: .top).padding(10)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
+            }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
 
-            HStack {
-                Text(model.snapshot.system.chip ?? "Apple Silicon")
-                Spacer()
-                Text("macOS \(model.snapshot.system.macOS)")
+            HStack(spacing: 8) {
+                Text(model.snapshot.system.chip ?? "Apple Silicon").lineLimit(1)
+                Spacer(minLength: 4)
+                Text("macOS \(model.snapshot.system.macOS)").lineLimit(1)
                 Button("Copy snapshot") { model.copySnapshot() }.buttonStyle(.plain).foregroundStyle(.secondary)
                 Button("Quit") { NSApplication.shared.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
+                if panelController.pinned {
+                    Image(systemName: "window.resize.bottomright").font(.caption).foregroundStyle(.tertiary)
+                        .frame(width: 14, height: 14).gesture(DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                if panelController.resizeStartSize == nil { panelController.resizeStartSize = panelController.panel.frame.size }
+                                guard let start = panelController.resizeStartSize else { return }
+                                panelController.resizePanel(width: start.width + value.translation.width, height: start.height - value.translation.height)
+                            }.onEnded { _ in panelController.resizeStartSize = nil })
+                        .accessibilityLabel("Resize panel")
+                }
             }.font(.caption2).foregroundStyle(.secondary).padding(10)
         }
         .frame(minWidth: 300, idealWidth: 380, maxWidth: .infinity, minHeight: 260, maxHeight: .infinity)
-        .background(.regularMaterial)
+        .background {
+            if #available(macOS 26.0, *) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.clear)
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            } else {
+                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.regularMaterial)
+            }
+        }
+        .opacity(model.panelOpacity)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .environment(\.locale, model.locale)
     }
+}
+
+private struct SectionDropDelegate: DropDelegate {
+    let section: String
+    let model: AppModel
+    func dropEntered(info: DropInfo) {
+        guard let provider = info.itemProviders(for: [UTType.plainText]).first else { return }
+        _ = provider.loadObject(ofClass: NSString.self) { value, _ in
+            guard let value = value as? String else { return }
+            Task { @MainActor in model.moveSection(value, before: section) }
+        }
+    }
+    func performDrop(info: DropInfo) -> Bool { true }
 }
 
 private struct GlanceTile: View {
@@ -79,24 +132,46 @@ private struct GlanceTile: View {
 private struct CardView: View {
     @Environment(AppModel.self) private var model
     let title: String
+    let isHidden: Bool
+    let editMode: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button {
-                if model.expanded.contains(title) { model.expanded.remove(title) } else { model.expanded.insert(title) }
-            } label: {
-                HStack {
-                    Image(systemName: icon).foregroundStyle(.primary).frame(width: 20)
-                    Text(LocalizedStringKey(title)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                    if !model.expanded.contains(title) { Text(summary(for: title)).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-                    Spacer(minLength: 3)
-                    Image(systemName: model.expanded.contains(title) ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, minHeight: 36, alignment: .leading).contentShape(Rectangle()).padding(.horizontal, 10)
-            }.buttonStyle(.plain)
-            if model.expanded.contains(title) {
+            HStack(spacing: 6) {
+                if editMode {
+                    Image(systemName: "line.3.horizontal").foregroundStyle(.secondary)
+                        .contentShape(Rectangle()).onDrag { NSItemProvider(object: title as NSString) }
+                        .accessibilityLabel("Drag to reorder \(title)")
+                    Button { model.moveSection(title, by: -1) } label: { Image(systemName: "chevron.up") }
+                        .buttonStyle(.plain).font(.caption2).accessibilityLabel("Move \(title) up")
+                    Button { model.moveSection(title, by: 1) } label: { Image(systemName: "chevron.down") }
+                        .buttonStyle(.plain).font(.caption2).accessibilityLabel("Move \(title) down")
+                }
+                Button {
+                    guard !editMode else { return }
+                    if model.expanded.contains(title) { model.expanded.remove(title) } else { model.expanded.insert(title) }
+                } label: {
+                    HStack {
+                        Image(systemName: icon).foregroundStyle(.primary).frame(width: 20)
+                        Text(LocalizedStringKey(title)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                        if !editMode && !model.expanded.contains(title) { Text(summary(for: title)).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                        Spacer(minLength: 3)
+                        if !editMode { Image(systemName: model.expanded.contains(title) ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(.secondary) }
+                    }.contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityAddTraits(.isButton)
+                if editMode {
+                    Button { model.setVisibleSection(title, visible: isHidden) } label: {
+                        Image(systemName: isHidden ? "eye.slash" : "eye").foregroundStyle(isHidden ? .secondary : .primary)
+                    }.buttonStyle(.plain).help(isHidden ? Text("Show card") : Text("Hide card"))
+                        .accessibilityLabel(isHidden ? "Show \(title)" : "Hide \(title)")
+                }
+            }.frame(maxWidth: .infinity, minHeight: 36, alignment: .leading).padding(.horizontal, 10)
+            if !editMode && model.expanded.contains(title) {
                 Divider().padding(.horizontal, 10)
                 content.frame(maxWidth: .infinity, alignment: .leading).padding(10)
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(isHidden ? 0.48 : 1)
             .background(.background.opacity(0.85), in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(.quaternary, lineWidth: 0.5))
     }
@@ -122,7 +197,6 @@ private struct CardView: View {
         default: EmptyView()
         }
     }
-
 
 
     private func summary(for section: String) -> String {

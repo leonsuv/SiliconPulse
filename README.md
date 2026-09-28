@@ -1,17 +1,33 @@
 # SiliconPulse
 
-SiliconPulse is a lightweight native macOS menu bar monitor for Apple Silicon Macs running macOS 14 or later. It samples only while the popover is open; when closed it refreshes battery and selected menu bar metrics every five seconds. The app does not use sudo, a privileged helper, or `powermetrics`.
+A lightweight native macOS menu bar monitor for Apple Silicon Macs running macOS 14 or later. SiliconPulse uses public system interfaces where available and falls back to `n/a` when a reading is unavailable. Sampling runs at one second while the panel is visible and at five seconds for the menu bar label.
 
 ## Features
 
-- Battery charge, health, capacity, electrical readings, adapter state, and battery power history
-- CPU and GPU utilization, per-core activity, memory pressure and paging, power telemetry, and temperatures
-- Disk capacity, SMART status, disk throughput and IOPS, mounted removable volumes
-- Network rates, local interface details, Wi-Fi signal and link properties, optional TCP latency probe
-- Bluetooth device battery levels, fans when exported by the system, process CPU and memory ranking
-- Sleep blockers, model and system details, collapsible and reorderable sections
-- Configurable menu bar metrics, history duration, units, compact rows, login startup, local alerts, and copyable snapshot
-- English and German interface strings
+- Battery charge, health, capacities, electrical readings, adapter state, and power history
+- CPU and GPU utilization, per-core activity, memory pressure, disk activity, and temperatures
+- Energy estimates, Wi-Fi link details, Bluetooth battery levels, fans, process ranking, and sleep blockers
+- Resizable, pinnable telemetry panel with collapsible cards and live sparklines
+- Reorderable cards and visibility controls in Edit mode
+- Configurable menu bar metrics, units, history, alerts, and launch at login
+- English and German interface
+
+## Panel controls
+
+Click the status item to open or close the panel. Use the pin button in the header to keep it on screen; a pinned panel can be moved by dragging its background and resized from its edges or the lower-right grip. Click the pin again to return it beneath the menu bar. When pinned, the header close button hides the panel.
+
+Use the pencil button to enter Edit mode. Cards collapse to their headers so they are easy to rearrange. Drag the handle to reorder, or use the up/down controls. The eye button hides or restores a card. Hidden cards are omitted from normal view and their collectors pause. Reset layout restores the default ordering, visibility, and expanded cards.
+
+## Settings
+
+Open Settings from the gear button or the status item's right-click menu.
+
+- **General:** login startup, Dock icon, language, panel opacity, refresh rate, history duration, compact rows
+- **Menu Bar:** selectable and reorderable metrics, symbol, separator, and preview
+- **Sections:** card visibility, order, and default expanded state
+- **Units:** temperature, byte units, network bits, and clock format
+- **Notifications:** battery, thermal, CPU, memory pressure, disk, SMART, temperature, and Bluetooth thresholds; cooldown and quiet hours
+- **Advanced:** optional network latency probe, sensor sources, snapshot controls, settings import/export, reset, and About
 
 ## Install
 
@@ -19,19 +35,17 @@ Download `SiliconPulse.zip` from [GitHub Releases](../../releases), unzip it, an
 
 ## Build from source
 
-Requires Xcode command line tools and Swift 5.9 or later. Run:
+Requires Xcode command line tools and Swift 5.9 or later:
 
 ```sh
 ./build.sh
 ```
 
-This creates `SiliconPulse.app` in the repository root. The project uses only Apple frameworks and ships no third-party dependencies.
+This creates `SiliconPulse.app` in the repository root. There are no third-party dependencies. The app does not require `sudo`, a privileged helper, or `powermetrics`; it reads telemetry through the current user's system APIs.
 
-## Private APIs used
+## Private APIs
 
-IOReport provides Apple Silicon energy channels, and IOHIDEventSystem provides sensor readings. Both interfaces are private and version-dependent, are loaded dynamically, and fall back to `n/a` when symbols or readings are unavailable. AppleSMC fan readings are best-effort and the fan card appears only when fan properties are exposed. The app does not request serial numbers, SSIDs, public IP information, or administrator privileges.
-
-The optional latency probe is off by default. Enabling it makes a TCP connection request to `1.1.1.1:443` to measure connection time.
+IOReport and AppleSMC sensor access are private, version-dependent interfaces. They are isolated in collectors and readings fall back to `n/a` when unavailable. CoreWLAN reads signal and link properties without accessing the SSID. The optional TCP latency probe is disabled by default; when enabled, it connects to the configured IPv4 host on port 443.
 
 ## Screenshot
 

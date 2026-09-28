@@ -3,7 +3,7 @@ import Darwin
 
 /// Optional opt-in TCP connect timing to 1.1.1.1:443; never runs unless enabled in Settings.
 struct NetworkLatencyProbe {
-    static func measure() -> Double? {
+    static func measure(host: String = "1.1.1.1") -> Double? {
         let descriptor = socket(AF_INET, SOCK_STREAM, 0)
         guard descriptor >= 0 else { return nil }
         defer { close(descriptor) }
@@ -13,7 +13,7 @@ struct NetworkLatencyProbe {
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         address.sin_family = sa_family_t(AF_INET)
         address.sin_port = UInt16(443).bigEndian
-        guard inet_pton(AF_INET, "1.1.1.1", &address.sin_addr) == 1 else { return nil }
+        guard inet_pton(AF_INET, host, &address.sin_addr) == 1 else { return nil }
         let start = DispatchTime.now().uptimeNanoseconds
         let result = withUnsafePointer(to: &address) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
