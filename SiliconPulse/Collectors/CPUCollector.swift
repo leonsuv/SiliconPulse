@@ -58,8 +58,8 @@ struct CPUCollector {
         let loadCount = getloadavg(&averages, 3)
         let loadAverage = loadCount > 0 ? Array(averages.prefix(Int(loadCount))) : []
         var pids = [pid_t](repeating: 0, count: 4096)
-        let pidBytes = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
-        let processCount = pidBytes > 0 ? pids.prefix(Int(pidBytes)).filter { $0 > 0 }.count : nil
+        let pidCount = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+        let processCount = pidCount > 0 ? pids.prefix(min(Int(pidCount), pids.count)).filter { $0 > 0 }.count : nil
         return CPUReading(cores: cores, load: load, thermalState: ProcessInfo.processInfo.thermalState.rawValue,
                           user: user, system: system, idle: idle, loadAverage: loadAverage, processCount: processCount,
                           eAverage: eValues.isEmpty ? nil : eValues.reduce(0, +) / Double(eValues.count),

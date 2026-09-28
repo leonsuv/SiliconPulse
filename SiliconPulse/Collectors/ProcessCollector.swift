@@ -12,14 +12,15 @@ struct ProcessCollector {
 
     mutating func collect(sortByMemory: Bool = false) -> [ProcessReading] {
         var pids = [pid_t](repeating: 0, count: 4096)
-        let bytes = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
-        guard bytes > 0 else { return [] }
+        // proc_listallpids returns a PID count, not a byte count.
+        let pidCount = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+        guard pidCount > 0 else { return [] }
         let wallNow = mach_absolute_time()
         let wallNowNs = UInt64((Double(wallNow) * Double(timebase.numer)) / Double(timebase.denom))
         let oldWall = previousWallNanoseconds
         var nextCPU: [Int32: UInt64] = [:]
         var readings: [ProcessReading] = []
-        for pid in pids.prefix(Int(bytes)).filter({ $0 > 0 }) {
+        for pid in pids.prefix(min(Int(pidCount), pids.count)).filter({ $0 > 0 }) {
             var info = proc_taskinfo()
             let size = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &info, Int32(MemoryLayout<proc_taskinfo>.size))
             guard size == MemoryLayout<proc_taskinfo>.size else { continue }
@@ -30,9 +31,7 @@ struct ProcessCollector {
             let wallDelta = wallNowNs - oldWall
             guard wallDelta <= 10_000_000_000 else { continue }
             let cpuDelta = cpuNs >= oldCPU ? cpuNs - oldCPU : 0
-            var usage: rusage_info_t?
-            guard proc_pid_rusage(pid, RUSAGE_INFO_V4, &usage) == 0, let usage else { continue }
-            let footprint = usage.assumingMemoryBound(to: rusage_info_v4.self).pointee.ri_phys_footprint
+            let footprint = UInt64(info.pti_resident_size)
             let name = processName(pid)
             let percent = Double(cpuDelta) / Double(wallDelta) * 100
             readings.append(ProcessReading(id: pid, name: name.isEmpty ? "Process \(pid)" : name, cpuPercent: percent, memoryBytes: footprint))

@@ -36,17 +36,14 @@ struct MemoryCollector {
         return MemoryReading(used: used, wired: wired, compressed: compressed, pressure: nil, free: free, app: Self.appMemoryFootprint(), cached: cached, swapUsed: swapUsed, pageInPerSecond: pageIn, pageOutPerSecond: pageOut, usedPercent: percentage)
     }
     private static func appMemoryFootprint() -> UInt64? {
-        var pids = [pid_t](repeating: 0, count: 4096)
-        let bytes = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
-        guard bytes > 0 else { return nil }
-        var total: UInt64 = 0
-        for pid in pids.prefix(Int(bytes)).filter({ $0 > 0 }) {
-            var usage: rusage_info_t?
-            if proc_pid_rusage(pid, RUSAGE_INFO_V4, &usage) == 0, let usage {
-                total &+= usage.assumingMemoryBound(to: rusage_info_v4.self).pointee.ri_phys_footprint
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let status = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
             }
         }
-        return total > 0 ? total : nil
+        return status == KERN_SUCCESS ? info.phys_footprint : nil
     }
 
 }
