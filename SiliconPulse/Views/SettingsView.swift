@@ -206,7 +206,6 @@ struct SettingsView: View {
         model.decimalUnits = false; model.networkBits = false; model.compactRows = false
         model.panelOpacity = 0.94; model.showDockIcon = false; model.reopenPinnedAtLaunch = true
         model.showMenuIcons = true; model.menuSeparator = "Dot"; model.enableHIDTemps = true; model.enableSMCFans = true
-        PanelController.active?.setPinned(false)
         model.restartTimer()
     }
 }

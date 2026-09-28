@@ -24,23 +24,23 @@ struct DashboardView: View {
                 Text("SiliconPulse").font(.headline).foregroundStyle(.primary)
                 if panelController.editMode { Text("Edit Mode").font(.caption).foregroundStyle(.secondary) }
                 Spacer(minLength: 4)
-                Button { panelController.setPinned(!panelController.pinned) } label: {
-                    Image(systemName: panelController.pinned ? "pin.fill" : "pin")
-                        .foregroundStyle(panelController.pinned ? Color.accentColor : Color.primary)
-                }.buttonStyle(.plain).help(panelController.pinned ? Text("Unpin panel") : Text("Pin panel"))
-                    .accessibilityLabel(panelController.pinned ? "Unpin panel" : "Pin panel")
+                Button { panelController.setPinned(!panelController.isPinned) } label: {
+                    Image(systemName: panelController.isPinned ? "pin.fill" : "pin")
+                        .foregroundStyle(panelController.isPinned ? Color.accentColor : Color.primary)
+                }.buttonStyle(.plain).help(panelController.isPinned ? Text("Unpin panel") : Text("Pin panel"))
+                    .accessibilityLabel(panelController.isPinned ? "Unpin panel" : "Pin panel")
                 Button { panelController.editMode.toggle() } label: {
                     Image(systemName: panelController.editMode ? "checkmark" : "pencil").foregroundStyle(.primary)
                 }.buttonStyle(.plain).help(panelController.editMode ? Text("Done editing") : Text("Edit cards"))
                     .accessibilityLabel(panelController.editMode ? "Done editing" : "Edit cards")
                 Button(action: onSettings) { Image(systemName: "gearshape").foregroundStyle(.primary) }
                     .buttonStyle(.plain).help(Text("Settings"))
-                if panelController.pinned {
+                if panelController.isPinned {
                     Button { panelController.close() } label: { Image(systemName: "xmark").foregroundStyle(.secondary) }
                         .buttonStyle(.plain).help(Text("Close panel")).accessibilityLabel("Close panel")
                 }
             }.padding(.horizontal, 16).padding(.vertical, 10)
-                .background { WindowDragHandle(enabled: panelController.pinned) }
+                .background { WindowDragHandle(enabled: panelController.isPinned) }
 
             if !panelController.editMode {
                 HStack(spacing: 5) {
@@ -49,7 +49,7 @@ struct DashboardView: View {
                     GlanceTile(title: "RAM", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple)
                     GlanceTile(title: "Battery W", value: model.value(for: "Battery W"), points: model.batteryPowerHistory, color: .orange)
                 }.padding(.horizontal, 10).padding(.bottom, 8)
-                    .background { WindowDragHandle(enabled: panelController.pinned) }
+                    .background { WindowDragHandle(enabled: panelController.isPinned) }
             }
 
             ScrollView {
@@ -74,7 +74,7 @@ struct DashboardView: View {
                 Text("macOS \(model.snapshot.system.macOS)").lineLimit(1)
                 Button("Copy snapshot") { model.copySnapshot() }.buttonStyle(.plain).foregroundStyle(.secondary)
                 Button("Quit") { NSApplication.shared.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
-                if panelController.pinned {
+                if panelController.isPinned {
                     Image(systemName: "window.resize.bottomright").font(.caption).foregroundStyle(.tertiary)
                         .frame(width: 14, height: 14).gesture(DragGesture(minimumDistance: 1)
                             .onChanged { value in

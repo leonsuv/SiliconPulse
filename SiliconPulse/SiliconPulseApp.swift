@@ -38,8 +38,29 @@ import AppKit
             Task { @MainActor in self?.updateStatusLabel() }
         }
         menuTimer?.tolerance = 1
-        if (UserDefaults.standard.object(forKey: "reopenPinnedAtLaunch") as? Bool ?? true), panelController.pinned {
+        if (UserDefaults.standard.object(forKey: "reopenPinnedAtLaunch") as? Bool ?? true), panelController.isPinned {
             panelController.show()
+        }
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("--pin-qa-relaunch") {
+            panelController.panel.qaLogging = true
+            panelController.panel.logPinState("launch-restored")
+        }
+        if args.contains("--pin-qa") {
+            panelController.panel.qaLogging = true
+            panelController.setPinned(true)
+            panelController.show()
+        }
+        if args.contains("--pin-qa-escape") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                self?.panelController.panel.handleEscape()
+            }
+        }
+        if args.contains("--pin-qa-settings") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                self?.openSettings()
+                self?.panelController.panel.logPinState("settings-open")
+            }
         }
     }
     func applicationWillTerminate(_ notification: Notification) { panelController.persistFrame() }
@@ -49,7 +70,7 @@ import AppKit
     @objc private func showContextMenu(_ recognizer: NSClickGestureRecognizer) {
         guard recognizer.state == .ended else { return }
         let menu = NSMenu()
-        let pin = NSMenuItem(title: panelController.pinned ? "Unpin" : "Pin", action: #selector(togglePin), keyEquivalent: "")
+        let pin = NSMenuItem(title: panelController.isPinned ? "Unpin" : "Pin", action: #selector(togglePin), keyEquivalent: "")
         pin.target = self
         menu.addItem(pin)
         menu.addItem(.separator())
@@ -63,7 +84,7 @@ import AppKit
         if let button = statusItem.button { menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY), in: button) }
     }
 
-    @objc private func togglePin() { panelController.setPinned(!panelController.pinned) }
+    @objc private func togglePin() { panelController.setPinned(!panelController.isPinned) }
     @objc private func openSettings() {
         NSApplication.shared.activate(ignoringOtherApps: true)
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)

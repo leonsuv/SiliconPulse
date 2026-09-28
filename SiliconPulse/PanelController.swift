@@ -3,7 +3,8 @@ import SwiftUI
 import Observation
 
 @MainActor final class ManagedPanel: NSPanel, NSWindowDelegate {
-    var isPinned = false
+    var pinState: () -> Bool = { false }
+    var isPinned: Bool { pinState() }
     var visibilityChanged: ((Bool) -> Void)?
     var frameChanged: ((NSRect) -> Void)?
     private var observers: [NSObjectProtocol] = []
@@ -12,9 +13,10 @@ import Observation
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53, !isPinned { orderOut(nil); return }
+        if event.keyCode == 53 { handleEscape(); return }
         super.keyDown(with: event)
     }
+    func handleEscape() { if !isPinned { orderOut(nil) }; logPinState("escape") }
 
     override func becomeKey() { super.becomeKey(); notifyVisibility() }
     override func resignKey() { super.resignKey(); notifyVisibility() }
@@ -23,16 +25,29 @@ import Observation
         observers.append(center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: self, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.notifyVisibility() }
         })
+        observers.append(center.addObserver(forName: NSApplication.didResignActiveNotification, object: NSApp, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.notifyVisibility(); self?.logPinState("application-deactivated") }
+        })
         for name in [NSWindow.didMoveNotification, NSWindow.didEndLiveResizeNotification] {
             observers.append(center.addObserver(forName: name, object: self, queue: .main) { [weak self] _ in
                 Task { @MainActor in self?.scheduleFrameSave() }
             })
         }
     }
-    func notifyVisibility() { visibilityChanged?(isVisible && occlusionState.contains(.visible)) }
+    func notifyVisibility() {
+        let visible = isPinned ? (isVisible && occlusionState.contains(.visible)) : (isVisible && isKeyWindow && occlusionState.contains(.visible))
+        visibilityChanged?(visible)
+        logPinState("visibility")
+    }
     func windowDidMove(_ notification: Notification) { scheduleFrameSave() }
     func windowDidResize(_ notification: Notification) { scheduleFrameSave() }
     func windowDidResignKey(_ notification: Notification) { if !isPinned { orderOut(nil) }; notifyVisibility() }
+    var qaLogging = false
+    func logPinState(_ event: String) {
+        guard qaLogging else { return }
+        let line = "\(Date.now.formatted()) event=\(event) pinned=\(isPinned) visible=\(isVisible) occlusionVisible=\(occlusionState.contains(.visible)) key=\(isKeyWindow)\n"
+        FileHandle.standardOutput.write(Data(line.utf8))
+    }
     func flushFrameSave() { frameSaveTask?.cancel(); frameChanged?(frame) }
     private func scheduleFrameSave() {
         frameSaveTask?.cancel()
@@ -47,9 +62,11 @@ import Observation
 
 @MainActor @Observable final class PanelController {
     static weak var active: PanelController?
-    static var sharedPinned: Bool { active?.pinned ?? false }
+    static var sharedPinned: Bool { active?.isPinned ?? false }
     let model: AppModel
-    private(set) var pinned = UserDefaults.standard.bool(forKey: "panelPinned")
+    private(set) var isPinned = UserDefaults.standard.bool(forKey: "panelPinned") {
+        didSet { UserDefaults.standard.set(isPinned, forKey: "panelPinned") }
+    }
     var editMode = false
     var resizeStartSize: CGSize?
     var showLayoutResetConfirmation = false
@@ -66,13 +83,15 @@ import Observation
         panel = ManagedPanel(contentRect: initial, styleMask: [.borderless, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
         panel.hasShadow = true
         panel.level = .statusBar
         panel.isMovableByWindowBackground = false
         panel.delegate = panel
         panel.minSize = NSSize(width: 300, height: 260)
         panel.maxSize = NSSize(width: 700, height: screen.visibleFrame.height)
-        panel.isPinned = pinned
+        panel.pinState = { [weak self] in self?.isPinned ?? false }
         let root = DashboardView(panelController: self, onSettings: { [weak self] in self?.openSettings() })
             .environment(model).environment(\.locale, model.locale)
         panel.contentView = NSHostingView(rootView: root)
@@ -84,24 +103,22 @@ import Observation
     }
 
     func toggle() {
-        if panel.isVisible { panel.orderOut(nil) }
+        if panel.isVisible { panel.orderOut(nil); panel.notifyVisibility() }
         else { show() }
     }
     func setStatusButton(_ button: NSStatusBarButton) { statusButton = button }
     func show() {
-        if !pinned { anchorBelowStatusItem() }
+        if !isPinned { anchorBelowStatusItem() }
         panel.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
         panel.notifyVisibility()
     }
-    func close() { panel.orderOut(nil) }
+    func close() { panel.orderOut(nil); panel.notifyVisibility() }
 
     func setPinned(_ value: Bool) {
-        guard pinned != value else { return }
+        guard isPinned != value else { return }
         let wasVisible = panel.isVisible
-        pinned = value
-        panelPinnedSave(value)
-        panel.isPinned = value
+        isPinned = value
         applyMode(restoreFrame: false)
         if !value { anchorBelowStatusItem() }
         if wasVisible { panel.makeKeyAndOrderFront(nil) }
@@ -114,24 +131,23 @@ import Observation
     }
 
     func setWidth(_ width: CGFloat) {
-        guard !pinned else { return }
+        guard !isPinned else { return }
         var frame = panel.frame
         frame.size.width = min(700, max(300, width))
         panel.setFrame(frame, display: true)
         UserDefaults.standard.set(Double(frame.width), forKey: "panelWidth")
     }
     func resizePanel(width: CGFloat, height: CGFloat) {
-        guard pinned else { return }
+        guard isPinned else { return }
         var frame = panel.frame
         frame.size.width = min(700, max(300, width))
         frame.size.height = min((panel.screen ?? NSScreen.main)?.visibleFrame.height ?? 1000, max(260, height))
         panel.setFrame(frame, display: true)
     }
 
-    private func panelPinnedSave(_ value: Bool) { UserDefaults.standard.set(value, forKey: "panelPinned") }
     private func applyMode(restoreFrame: Bool) {
         let visible = NSScreen.screens.first(where: { $0.frame.intersects(panel.frame) }) ?? NSScreen.main ?? NSScreen.screens[0]
-        if pinned {
+        if isPinned {
             panel.level = .floating
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             panel.isMovableByWindowBackground = true
@@ -155,7 +171,7 @@ import Observation
     }
 
     private func saveFrame(_ frame: NSRect) {
-        guard pinned else { UserDefaults.standard.set(Double(frame.width), forKey: "panelWidth"); return }
+        guard isPinned else { UserDefaults.standard.set(Double(frame.width), forKey: "panelWidth"); return }
         let screen = NSScreen.screens.first(where: { $0.frame.intersects(frame) }) ?? NSScreen.main
         if let screen { UserDefaults.standard.set(NSStringFromRect(frame), forKey: Self.frameKey(for: screen)) }
         UserDefaults.standard.set(NSStringFromRect(frame), forKey: "pinnedFrame")

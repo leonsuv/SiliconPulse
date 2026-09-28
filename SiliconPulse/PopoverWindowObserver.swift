@@ -32,14 +32,30 @@ import AppKit
             return
         }
         observedWindow = window
-        visibilityChanged?(window.isKeyWindow)
+        visibilityChanged?(isVisible(window))
         let center = NotificationCenter.default
         notificationTokens.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.visibilityChanged?(true) }
         })
         notificationTokens.append(center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.visibilityChanged?(false) }
+            Task { @MainActor in
+                guard let self, let window = self.observedWindow else { return }
+                self.visibilityChanged?(self.isVisible(window))
+            }
         })
+        notificationTokens.append(center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, let window = self.observedWindow else { return }
+                self.visibilityChanged?(self.isVisible(window))
+            }
+        })
+    }
+
+    private func isVisible(_ window: NSWindow) -> Bool {
+        if let panel = window as? ManagedPanel, panel.isPinned {
+            return panel.isVisible && panel.occlusionState.contains(.visible)
+        }
+        return window.isVisible && window.isKeyWindow && window.occlusionState.contains(.visible)
     }
 
     func detach() {
