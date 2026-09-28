@@ -19,6 +19,7 @@ import AppKit
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(UserDefaults.standard.bool(forKey: "showDockIcon") ? .regular : .accessory)
         let model = AppModel.shared
+        model.snapshot.system = SystemCollector().collect()
         panelController = PanelController(model: model)
         model.onMenuLabelUpdate = { [weak self] in self?.updateStatusLabel() }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -41,6 +42,7 @@ import AppKit
             panelController.show()
         }
     }
+    func applicationWillTerminate(_ notification: Notification) { panelController.persistFrame() }
 
     @objc private func togglePanel() { panelController.toggle() }
 

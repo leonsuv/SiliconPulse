@@ -7,6 +7,7 @@ import Observation
     var visibilityChanged: ((Bool) -> Void)?
     var frameChanged: ((NSRect) -> Void)?
     private var observers: [NSObjectProtocol] = []
+    private var frameSaveTask: Task<Void, Never>?
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
@@ -22,12 +23,26 @@ import Observation
         observers.append(center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: self, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.notifyVisibility() }
         })
+        for name in [NSWindow.didMoveNotification, NSWindow.didEndLiveResizeNotification] {
+            observers.append(center.addObserver(forName: name, object: self, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.scheduleFrameSave() }
+            })
+        }
     }
     func notifyVisibility() { visibilityChanged?(isVisible && occlusionState.contains(.visible)) }
-    func windowDidMove(_ notification: Notification) { frameChanged?(frame) }
-    func windowDidResize(_ notification: Notification) { frameChanged?(frame) }
+    func windowDidMove(_ notification: Notification) { scheduleFrameSave() }
+    func windowDidResize(_ notification: Notification) { scheduleFrameSave() }
     func windowDidResignKey(_ notification: Notification) { if !isPinned { orderOut(nil) }; notifyVisibility() }
-    deinit { observers.forEach(NotificationCenter.default.removeObserver) }
+    func flushFrameSave() { frameSaveTask?.cancel(); frameChanged?(frame) }
+    private func scheduleFrameSave() {
+        frameSaveTask?.cancel()
+        frameSaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let self else { return }
+            self.frameChanged?(self.frame)
+        }
+    }
+    deinit { frameSaveTask?.cancel(); observers.forEach(NotificationCenter.default.removeObserver) }
 }
 
 @MainActor @Observable final class PanelController {
@@ -123,7 +138,8 @@ import Observation
             panel.styleMask.insert(.resizable)
             panel.minSize = NSSize(width: 300, height: 260)
             panel.maxSize = NSSize(width: 700, height: visible.visibleFrame.height)
-            if restoreFrame, let raw = UserDefaults.standard.string(forKey: "pinnedFrame") {
+            let frameKey = Self.frameKey(for: visible)
+            if restoreFrame, let raw = UserDefaults.standard.string(forKey: frameKey) ?? UserDefaults.standard.string(forKey: "pinnedFrame") {
                 let saved = NSRectFromString(raw)
                 if visible.visibleFrame.contains(saved) { panel.setFrame(saved, display: false) }
                 else { panel.setFrame(visible.visibleFrame.insetBy(dx: 20, dy: 20), display: false) }
@@ -140,8 +156,15 @@ import Observation
 
     private func saveFrame(_ frame: NSRect) {
         guard pinned else { UserDefaults.standard.set(Double(frame.width), forKey: "panelWidth"); return }
+        let screen = NSScreen.screens.first(where: { $0.frame.intersects(frame) }) ?? NSScreen.main
+        if let screen { UserDefaults.standard.set(NSStringFromRect(frame), forKey: Self.frameKey(for: screen)) }
         UserDefaults.standard.set(NSStringFromRect(frame), forKey: "pinnedFrame")
     }
+    private static func frameKey(for screen: NSScreen) -> String {
+        let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        return "pinnedFrame.\(number?.stringValue ?? screen.localizedName)"
+    }
+    func persistFrame() { panel.flushFrameSave(); saveFrame(panel.frame) }
     private func anchorBelowStatusItem() {
         let screen = statusButton?.window?.screen ?? NSScreen.main ?? NSScreen.screens[0]
         let bounds = statusButton?.bounds ?? .zero

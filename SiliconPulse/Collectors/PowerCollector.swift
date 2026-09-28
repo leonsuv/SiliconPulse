@@ -69,6 +69,9 @@ struct PowerCollector {
             guard let name = channelName(channel)?.takeUnretainedValue() as String? else { continue }
             let unit = (unitLabel(channel)?.takeUnretainedValue() as String? ?? "").lowercased()
             let raw = Double(simpleInteger(channel, nil, 0))
+            if ProcessInfo.processInfo.arguments.contains("--dump-ioreport") {
+                print("[IOReport] group=Energy Model channel=\(name) unit=\(unit) rawDelta=\(raw)")
+            }
             let millijoules: Double
             if unit.contains("mj") { millijoules = raw }
             else if unit.contains("uj") || unit.contains("µj") { millijoules = raw / 1_000 }
@@ -76,14 +79,13 @@ struct PowerCollector {
             else if unit.contains("joule") || unit == "j" { millijoules = raw * 1_000 }
             else { continue }
             let watts = millijoules / 1_000 / elapsed
-            if ProcessInfo.processInfo.arguments.contains("--dump-ioreport") {
-                print("[IOReport] group=Energy Model channel=\(name) unit=\(unit) rawDelta=\(raw)")
-            }
             let normalized = name.lowercased()
-            if normalized.contains("gpu") { gpu = (gpu ?? 0) + watts }
+            if normalized.contains("dram") { dram = (dram ?? 0) + watts }
+            else if normalized.contains("gpu") { gpu = (gpu ?? 0) + watts }
             else if normalized.contains("ane") || normalized.contains("neural") { ane = (ane ?? 0) + watts }
-            else if normalized.contains("dram") || normalized.contains("memory") { dram = (dram ?? 0) + watts }
-            else if normalized.contains("cpu") || normalized.contains("cluster") || normalized.contains("core") || normalized.contains("package") { cpu = (cpu ?? 0) + watts }
+            else if name.hasPrefix("ECPU") || name.hasPrefix("PCPU") || name.hasPrefix("EACC") || name.hasPrefix("PACC") || name.hasPrefix("CPU Energy") {
+                cpu = (cpu ?? 0) + watts
+            }
         }
         let available = [cpu, gpu, ane, dram].compactMap { $0 }
         return PowerReading(cpu: cpu, gpu: gpu, ane: ane, dram: dram, combined: available.isEmpty ? nil : available.reduce(0, +), eFrequencyMHz: nil, pFrequencyMHz: nil, gpuFrequencyMHz: nil, eResidency: nil, pResidency: nil)

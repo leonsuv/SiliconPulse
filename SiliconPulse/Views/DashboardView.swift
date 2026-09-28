@@ -40,6 +40,7 @@ struct DashboardView: View {
                         .buttonStyle(.plain).help(Text("Close panel")).accessibilityLabel("Close panel")
                 }
             }.padding(.horizontal, 16).padding(.vertical, 10)
+                .background { WindowDragHandle(enabled: panelController.pinned) }
 
             if !panelController.editMode {
                 HStack(spacing: 5) {
@@ -48,6 +49,7 @@ struct DashboardView: View {
                     GlanceTile(title: "RAM", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple)
                     GlanceTile(title: "Battery W", value: model.value(for: "Battery W"), points: model.batteryPowerHistory, color: .orange)
                 }.padding(.horizontal, 10).padding(.bottom, 8)
+                    .background { WindowDragHandle(enabled: panelController.pinned) }
             }
 
             ScrollView {
@@ -86,11 +88,9 @@ struct DashboardView: View {
         }
         .frame(minWidth: 300, idealWidth: 380, maxWidth: .infinity, minHeight: 260, maxHeight: .infinity)
         .background {
-            if #available(macOS 26.0, *) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.clear)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            } else {
-                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.regularMaterial)
+            ZStack {
+                Rectangle().fill(.regularMaterial)
+                Color(nsColor: .windowBackgroundColor).opacity(0.75)
             }
         }
         .opacity(model.panelOpacity)

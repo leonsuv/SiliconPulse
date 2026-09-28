@@ -18,8 +18,11 @@ struct MemoryCollector {
         let free = UInt64(stats.free_count) * pageSize
         let wired = UInt64(stats.wire_count) * pageSize
         let compressed = UInt64(stats.compressor_page_count) * pageSize
-        let cached = UInt64(stats.inactive_count) * pageSize
-        let used = (UInt64(stats.active_count) + UInt64(stats.inactive_count) + UInt64(stats.wire_count) + UInt64(stats.compressor_page_count)) * pageSize
+        let internalPages = stats.internal_page_count > stats.purgeable_count
+            ? UInt64(stats.internal_page_count - stats.purgeable_count) : 0
+        let appMemory = internalPages * pageSize
+        let cached = (UInt64(stats.external_page_count) + UInt64(stats.purgeable_count)) * pageSize
+        let used = appMemory + UInt64(stats.wire_count) * pageSize + UInt64(stats.compressor_page_count) * pageSize
         var swap = xsw_usage(); var swapSize = MemoryLayout<xsw_usage>.size
         let swapUsed: UInt64? = sysctlbyname("vm.swapusage", &swap, &swapSize, nil, 0) == 0 ? UInt64(swap.xsu_used) : nil
         let now = Date()
@@ -33,19 +36,8 @@ struct MemoryCollector {
         var total: UInt64 = 0; var totalSize = MemoryLayout<UInt64>.size
         let physical = sysctlbyname("hw.memsize", &total, &totalSize, nil, 0) == 0 ? total : nil
         let percentage = physical.map { $0 > 0 ? Double(used) / Double($0) * 100 : 0 }
-        return MemoryReading(used: used, wired: wired, compressed: compressed, pressure: nil, free: free, app: Self.appMemoryFootprint(), cached: cached, swapUsed: swapUsed, pageInPerSecond: pageIn, pageOutPerSecond: pageOut, usedPercent: percentage)
+        return MemoryReading(used: used, wired: wired, compressed: compressed, pressure: nil, free: free, app: appMemory, cached: cached, swapUsed: swapUsed, pageInPerSecond: pageIn, pageOutPerSecond: pageOut, usedPercent: percentage)
     }
-    private static func appMemoryFootprint() -> UInt64? {
-        var info = task_vm_info_data_t()
-        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
-        let status = withUnsafeMutablePointer(to: &info) { pointer in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
-            }
-        }
-        return status == KERN_SUCCESS ? info.phys_footprint : nil
-    }
-
 }
 
 struct DiskCollector {
