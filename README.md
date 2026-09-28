@@ -1,6 +1,17 @@
 # SiliconPulse
 
-A small native macOS menu bar monitor for Apple Silicon (macOS 14+). The popover reports battery health and charge, CPU per-core activity, thermal state, memory, boot volume, network throughput, Wi-Fi signal and link rate, and top processes. It samples on demand while open and keeps the menu bar value lightweight.
+SiliconPulse is a lightweight native macOS menu bar monitor for Apple Silicon Macs running macOS 14 or later. It samples only while the popover is open; when closed it refreshes battery and selected menu bar metrics every five seconds. The app does not use sudo, a privileged helper, or `powermetrics`.
+
+## Features
+
+- Battery charge, health, capacity, electrical readings, adapter state, and battery power history
+- CPU and GPU utilization, per-core activity, memory pressure and paging, power telemetry, and temperatures
+- Disk capacity, SMART status, disk throughput and IOPS, mounted removable volumes
+- Network rates, local interface details, Wi-Fi signal and link properties, optional TCP latency probe
+- Bluetooth device battery levels, fans when exported by the system, process CPU and memory ranking
+- Sleep blockers, model and system details, collapsible and reorderable sections
+- Configurable menu bar metrics, history duration, units, compact rows, login startup, local alerts, and copyable snapshot
+- English and German interface strings
 
 ## Install
 
@@ -14,16 +25,13 @@ Requires Xcode command line tools and Swift 5.9 or later. Run:
 ./build.sh
 ```
 
-This creates `SiliconPulse.app` in the repository root. No third-party packages, sudo, privileged helper, or `powermetrics` are used. The app reads battery and host telemetry through macOS frameworks. IOReport is private and version-dependent; missing symbols or channels display as `n/a`.
+This creates `SiliconPulse.app` in the repository root. The project uses only Apple frameworks and ships no third-party dependencies.
 
-## Features
+## Private APIs used
 
-- Battery health calculated as NominalChargeCapacity / DesignCapacity
-- Power counters and CPU/GPU frequency residency where available
-- CPU load history and per-core E/P gauges
-- Memory, disk, network, Wi-Fi, thermal, and process cards
-- Settings for menu bar metric, refresh interval, temperature units, and launch at login
-- English and German localization
+IOReport provides Apple Silicon energy channels, and IOHIDEventSystem provides sensor readings. Both interfaces are private and version-dependent, are loaded dynamically, and fall back to `n/a` when symbols or readings are unavailable. AppleSMC fan readings are best-effort and the fan card appears only when fan properties are exposed. The app does not request serial numbers, SSIDs, public IP information, or administrator privileges.
+
+The optional latency probe is off by default. Enabling it makes a TCP connection request to `1.1.1.1:443` to measure connection time.
 
 ## Screenshot
 

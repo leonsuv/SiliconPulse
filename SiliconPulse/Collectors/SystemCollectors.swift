@@ -33,14 +33,28 @@ struct MemoryCollector {
         var total: UInt64 = 0; var totalSize = MemoryLayout<UInt64>.size
         let physical = sysctlbyname("hw.memsize", &total, &totalSize, nil, 0) == 0 ? total : nil
         let percentage = physical.map { $0 > 0 ? Double(used) / Double($0) * 100 : 0 }
-        return MemoryReading(used: used, wired: wired, compressed: compressed, pressure: nil, free: free, app: nil, cached: cached, swapUsed: swapUsed, pageInPerSecond: pageIn, pageOutPerSecond: pageOut, usedPercent: percentage)
+        return MemoryReading(used: used, wired: wired, compressed: compressed, pressure: nil, free: free, app: Self.appMemoryFootprint(), cached: cached, swapUsed: swapUsed, pageInPerSecond: pageIn, pageOutPerSecond: pageOut, usedPercent: percentage)
     }
+    private static func appMemoryFootprint() -> UInt64? {
+        var pids = [pid_t](repeating: 0, count: 4096)
+        let bytes = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+        guard bytes > 0 else { return nil }
+        var total: UInt64 = 0
+        for pid in pids.prefix(Int(bytes)).filter({ $0 > 0 }) {
+            var usage: rusage_info_t?
+            if proc_pid_rusage(pid, RUSAGE_INFO_V4, &usage) == 0, let usage {
+                total &+= usage.assumingMemoryBound(to: rusage_info_v4.self).pointee.ri_phys_footprint
+            }
+        }
+        return total > 0 ? total : nil
+    }
+
 }
 
 struct DiskCollector {
     func collect() -> DiskReading {
         let root = URL(fileURLWithPath: "/")
-        let keys: Set<URLResourceKey> = [.volumeTotalCapacityKey, .volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey, .volumeNameKey]
+        let keys: Set<URLResourceKey> = [.volumeTotalCapacityKey, .volumeAvailableCapacityKey, .volumeAvailableCapacityForImportantUsageKey, .volumeNameKey, .volumeLocalizedFormatDescriptionKey]
         guard let values = try? root.resourceValues(forKeys: keys) else { return DiskReading(total: nil, free: nil) }
         let volumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: [.volumeNameKey, .volumeTotalCapacityKey, .volumeAvailableCapacityKey, .volumeIsRemovableKey, .volumeIsEjectableKey], options: [.skipHiddenVolumes]) ?? []
         let external = volumes.compactMap { url -> ExternalVolume? in
@@ -49,7 +63,7 @@ struct DiskCollector {
             return ExternalVolume(id: url.path, name: info.volumeName ?? url.lastPathComponent, total: info.volumeTotalCapacity.map(UInt64.init), free: info.volumeAvailableCapacity.map(UInt64.init))
         }
         let filesystem: String? = nil
-        return DiskReading(total: values.volumeTotalCapacity.map(UInt64.init), free: values.volumeAvailableCapacity.map(UInt64.init), importantFree: values.volumeAvailableCapacityForImportantUsage.map { UInt64(max(0, $0)) }, volumeName: values.volumeName, fileSystem: filesystem, externalVolumes: external)
+        return DiskReading(total: values.volumeTotalCapacity.map(UInt64.init), free: values.volumeAvailableCapacity.map(UInt64.init), importantFree: values.volumeAvailableCapacityForImportantUsage.map { UInt64(max(0, $0)) }, volumeName: values.volumeName, fileSystem: values.volumeLocalizedFormatDescription ?? filesystem, externalVolumes: external)
     }
 
     static func smartStatus() -> String? {
@@ -123,7 +137,7 @@ struct SystemCollector {
         let version = NSDictionary(contentsOfFile: "/System/Library/CoreServices/SystemVersion.plist") as? [String: Any]
         var boot = timeval(); var size = MemoryLayout<timeval>.size
         let bootTime: Date? = sysctlbyname("kern.boottime", &boot, &size, nil, 0) == 0 ? Date(timeIntervalSince1970: TimeInterval(boot.tv_sec) + TimeInterval(boot.tv_usec) / 1_000_000) : nil
-        return SystemReading(chip: chip, model: model, macOS: ProcessInfo.processInfo.operatingSystemVersionString, build: version?["ProductBuildVersion"] as? String, uptime: ProcessInfo.processInfo.systemUptime, bootTime: bootTime, cpuCores: ProcessInfo.processInfo.processorCount, eCores: counts.e, pCores: counts.p, gpuCores: GPUCollector().collect().coreCount, memoryGB: totalMemory.map { Double($0) / 1_073_741_824 })
+        return SystemReading(chip: chip, model: model, macOS: ProcessInfo.processInfo.operatingSystemVersionString, build: version?["ProductBuildVersion"] as? String, uptime: ProcessInfo.processInfo.systemUptime, bootTime: bootTime, cpuCores: ProcessInfo.processInfo.processorCount, eCores: counts.e, pCores: counts.p, gpuCores: GPUCollector().collect().coreCount, memoryGB: totalMemory.map { Double($0) / 1_000_000_000 })
     }
     private func readString(_ name: String) -> String? { var value = [CChar](repeating: 0, count: 256); var size = value.count; guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }; return String(cString: value) }
     private func readUInt(_ name: String) -> UInt64? { var value: UInt64 = 0; var size = MemoryLayout<UInt64>.size; return sysctlbyname(name, &value, &size, nil, 0) == 0 ? value : nil }
