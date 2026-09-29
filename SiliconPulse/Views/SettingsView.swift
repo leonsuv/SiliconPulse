@@ -19,8 +19,40 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 18) {
+                Label("SiliconPulse", systemImage: "waveform.path.ecg").font(.headline).foregroundStyle(.blue).padding(.horizontal, 12).padding(.top, 24)
+                VStack(spacing: 4) {
+                    ForEach(Array(Self.tabs.enumerated()), id: \.offset) { index, tab in
+                        Button { tabSelection.index = index } label: {
+                            Label(LocalizedStringKey(tab.0), systemImage: tab.1)
+                                .font(.system(size: 13, weight: tabSelection.index == index ? .semibold : .regular))
+                                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.vertical, 10)
+                                .foregroundStyle(tabSelection.index == index ? Color.white : Color.primary)
+                                .background(tabSelection.index == index ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: 7))
+                        }.buttonStyle(.plain).accessibilityAddTraits(tabSelection.index == index ? .isSelected : [])
+                    }
+                }
+                Spacer()
+                Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0")")
+                    .font(.caption).foregroundStyle(.secondary).padding(12)
+            }.padding(.horizontal, 10).frame(width: 180).background(.regularMaterial)
+            Divider()
+            VStack(alignment: .leading, spacing: 0) {
+                Text(LocalizedStringKey(Self.tabs[min(6, max(0, tabSelection.index))].0))
+                    .font(.system(size: 24, weight: .semibold)).padding(.horizontal, 28).padding(.top, 24).padding(.bottom, 8)
+                settingsContent
+            }.frame(maxWidth: .infinity, maxHeight: .infinity).background(Color(nsColor: .windowBackgroundColor))
+        }.frame(minWidth: 760, minHeight: 560)
+            .environment(\.locale, model.locale)
+    }
+
+    private static let tabs = [("General", "slider.horizontal.3"), ("Menu Bar", "menubar.rectangle"), ("Sections", "rectangle.3.group"), ("Units", "ruler"), ("Notifications", "bell.badge"), ("Advanced", "gearshape.2"), ("Overlay", "rectangle.inset.filled")]
+
+    @ViewBuilder private var settingsContent: some View {
         @Bindable var settings = model
-        TabView(selection: $tabSelection.index) {
+        switch tabSelection.index {
+        case 0:
             Form {
                 Section("Startup") {
                     Toggle("Launch at login", isOn: Binding(get: { SMAppService.mainApp.status == .enabled }, set: { _ in model.toggleLogin() }))
@@ -31,6 +63,9 @@ struct SettingsView: View {
                     }
                 }
                 Section("Sampling and panel") {
+                    Picker("Appearance", selection: $settings.appearance) {
+                        Text("System").tag("System"); Text("Light").tag("Light"); Text("Dark").tag("Dark")
+                    }
                     Picker("Refresh interval", selection: $settings.refreshSeconds) {
                         Text("1 second").tag(1.0); Text("2 seconds").tag(2.0); Text("5 seconds").tag(5.0)
                     }.onChange(of: model.refreshSeconds) { _, value in UserDefaults.standard.set(value, forKey: "refreshSeconds"); model.restartTimer() }
@@ -39,13 +74,13 @@ struct SettingsView: View {
                     }.onChange(of: model.historyMinutes) { _, value in UserDefaults.standard.set(value, forKey: "historyMinutes") }
                     Toggle("Compact rows", isOn: $settings.compactRows).onChange(of: model.compactRows) { _, value in UserDefaults.standard.set(value, forKey: "compactRows") }
                     LabeledContent("Pinned panel opacity") {
-                        Slider(value: $settings.panelOpacity, in: 0.6...1) { Text("Opacity") }
+                        Slider(value: $settings.panelOpacity, in: 0.6...1) { Text("Opacity") }.labelsHidden()
                             .frame(width: 170).disabled(!PanelController.sharedPinned)
                     }
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
                 }
-            }.formStyle(.grouped).tabItem { Label("General", systemImage: "slider.horizontal.3") }.tag(0)
-
+            }.formStyle(.grouped)
+        case 1:
             Form {
                 Section("Visible menu bar metrics") {
                     ForEach(Array(model.menuMetrics.enumerated()), id: \.element) { index, metric in
@@ -82,24 +117,33 @@ struct SettingsView: View {
                     Text(model.menuMetrics.map { "\(model.menuSymbol(for: $0))  \(model.value(for: $0))" }.joined(separator: "   ·   "))
                         .font(.system(.body, design: .monospaced)).lineLimit(2)
                 }
-            }.formStyle(.grouped).tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }.tag(1)
-
-            NavigationStack {
-                List {
+            }.formStyle(.grouped)
+        case 2:
+            Form {
+                Section("Card layout") {
+                    HStack {
+                        Text("Sections").frame(maxWidth: .infinity, alignment: .leading)
+                        Text("Visible").frame(width: 60)
+                        Text("Expanded").frame(width: 80)
+                        Text("Order").frame(width: 54)
+                    }.font(.caption).foregroundStyle(.secondary)
                     ForEach(Array(model.sectionOrder.enumerated()), id: \.element) { index, section in
-                        HStack {
-                            Toggle(isOn: Binding(get: { model.visibleSections.contains(section) }, set: { model.setVisibleSection(section, visible: $0) })) {
-                                Text(LocalizedStringKey(section))
-                            }
+                        HStack(spacing: 8) {
+                            Text(LocalizedStringKey(section)).frame(maxWidth: .infinity, alignment: .leading)
+                            Toggle("Visible", isOn: Binding(get: { model.visibleSections.contains(section) }, set: { model.setVisibleSection(section, visible: $0) }))
+                                .toggleStyle(.checkbox).labelsHidden().frame(width: 60).accessibilityLabel(Text("Show \(section)"))
                             Toggle("Expanded", isOn: Binding(get: { model.expanded.contains(section) }, set: { if $0 { model.expanded.insert(section) } else { model.expanded.remove(section) } }))
-                                .toggleStyle(.checkbox).labelsHidden().help("Expanded by default")
-                            Button { model.moveSection(section, by: -1) } label: { Image(systemName: "chevron.up") }.disabled(index == 0).buttonStyle(.plain)
-                            Button { model.moveSection(section, by: 1) } label: { Image(systemName: "chevron.down") }.disabled(index == model.sectionOrder.count - 1).buttonStyle(.plain)
-                        }
-                    }.onMove(perform: model.moveSection)
-                }.navigationTitle("Sections")
-            }.tabItem { Label("Sections", systemImage: "rectangle.3.group") }.tag(2)
-
+                                .toggleStyle(.checkbox).labelsHidden().frame(width: 80).accessibilityLabel(Text("Expand \(section) by default"))
+                            HStack(spacing: 10) {
+                                Button { model.moveSection(section, by: -1) } label: { Image(systemName: "chevron.up") }.disabled(index == 0).accessibilityLabel(Text("Move \(section) up"))
+                                Button { model.moveSection(section, by: 1) } label: { Image(systemName: "chevron.down") }.disabled(index == model.sectionOrder.count - 1).accessibilityLabel(Text("Move \(section) down"))
+                            }.buttonStyle(.plain).frame(width: 54)
+                        }.padding(.vertical, 3)
+                    }
+                    Text("The overview starts with compact cards. Expanded defaults apply to category details.").font(.caption).foregroundStyle(.secondary)
+                }
+            }.formStyle(.grouped)
+        case 3:
             Form {
                 Section("Temperature and capacity") {
                     Toggle("Use Fahrenheit", isOn: $settings.fahrenheit).onChange(of: model.fahrenheit) { _, value in UserDefaults.standard.set(value, forKey: "fahrenheit") }
@@ -107,8 +151,8 @@ struct SettingsView: View {
                     Toggle("Network rates in bits", isOn: $settings.networkBits).onChange(of: model.networkBits) { _, value in UserDefaults.standard.set(value, forKey: "networkBits") }
                     Toggle("Use 24-hour time", isOn: $settings.use24HourTime)
                 }
-            }.formStyle(.grouped).tabItem { Label("Units", systemImage: "ruler") }.tag(3)
-
+            }.formStyle(.grouped)
+        case 4:
             Form {
                 Section {
                     Toggle("Enable notifications", isOn: Binding(get: { model.alertsEnabled }, set: { model.setAlertsEnabled($0) }))
@@ -144,8 +188,8 @@ struct SettingsView: View {
                         }
                     }
                 }
-            }.formStyle(.grouped).tabItem { Label("Notifications", systemImage: "bell.badge") }.tag(4)
-
+            }.formStyle(.grouped)
+        case 5:
             Form {
                 Section("Optional network request") {
                     Toggle("Enable latency probe", isOn: Binding(get: { model.latencyProbeEnabled }, set: { model.setLatencyProbeEnabled($0) }))
@@ -171,16 +215,15 @@ struct SettingsView: View {
                 }
                 Section("About") {
                     LabeledContent("SiliconPulse", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
-                    Link("GitHub project", destination: URL(string: "https://github.com")!)
+                    Link("GitHub project", destination: URL(string: "https://github.com/leonsuv/SiliconPulse")!)
                     Text("MIT License · Private telemetry interfaces: IOReport and AppleSMC sensor access.").font(.caption).foregroundStyle(.secondary)
                 }
-            }.formStyle(.grouped).tabItem { Label("Advanced", systemImage: "gearshape.2") }.tag(5)
-
+            }.formStyle(.grouped)
+        case 6:
             overlaySettings
-        }.padding(8).frame(minWidth: 650, minHeight: 520).navigationTitle("SiliconPulse Settings")
-            .environment(\.locale, model.locale)
+        default: EmptyView()
+        }
     }
-
 
     private var overlaySettings: some View {
         @Bindable var preferences = OverlayPreferences.shared
@@ -296,6 +339,7 @@ struct SettingsView: View {
         model.language = "System"
         model.refreshSeconds = 1; model.historyMinutes = 1; model.fahrenheit = false
         model.decimalUnits = false; model.networkBits = false; model.compactRows = false
+        model.appearance = "System"
         model.panelOpacity = 0.94; model.showDockIcon = false; model.reopenPinnedAtLaunch = true
         model.showMenuIcons = true; model.menuSeparator = "Dot"; model.enableHIDTemps = true; model.enableSMCFans = true
         model.restartTimer()

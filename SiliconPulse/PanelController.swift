@@ -68,6 +68,8 @@ import Observation
         didSet { UserDefaults.standard.set(isPinned, forKey: "panelPinned") }
     }
     var editMode = false
+    var category = "Overview"
+    var overviewExpanded: Set<String> = []
     var resizeStartSize: CGSize?
     var showLayoutResetConfirmation = false
     var panel: ManagedPanel!
@@ -77,7 +79,7 @@ import Observation
         self.model = model
         Self.active = self
         let screen = NSScreen.main ?? NSScreen.screens[0]
-        let width = max(300, UserDefaults.standard.double(forKey: "panelWidth").nonzeroOr(380))
+        let width = min(820, max(340, UserDefaults.standard.double(forKey: "panelWidth").nonzeroOr(420)))
         let height = min(screen.visibleFrame.height * 0.8, 640)
         let initial = NSRect(x: screen.visibleFrame.maxX - width - 20, y: screen.visibleFrame.maxY - height - 40, width: width, height: height)
         panel = ManagedPanel(contentRect: initial, styleMask: [.borderless, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
@@ -89,8 +91,8 @@ import Observation
         panel.level = .statusBar
         panel.isMovableByWindowBackground = false
         panel.delegate = panel
-        panel.minSize = NSSize(width: 300, height: 260)
-        panel.maxSize = NSSize(width: 700, height: screen.visibleFrame.height)
+        panel.minSize = NSSize(width: 340, height: 420)
+        panel.maxSize = NSSize(width: 820, height: screen.visibleFrame.height)
         panel.pinState = { [weak self] in self?.isPinned ?? false }
         let root = DashboardView(panelController: self)
             .environment(model).environment(\.locale, model.locale)
@@ -132,15 +134,15 @@ import Observation
     func setWidth(_ width: CGFloat) {
         guard !isPinned else { return }
         var frame = panel.frame
-        frame.size.width = min(700, max(300, width))
+        frame.size.width = min(820, max(340, width))
         panel.setFrame(frame, display: true)
         UserDefaults.standard.set(Double(frame.width), forKey: "panelWidth")
     }
     func resizePanel(width: CGFloat, height: CGFloat) {
         guard isPinned else { return }
         var frame = panel.frame
-        frame.size.width = min(700, max(300, width))
-        frame.size.height = min((panel.screen ?? NSScreen.main)?.visibleFrame.height ?? 1000, max(260, height))
+        frame.size.width = min(820, max(340, width))
+        frame.size.height = min((panel.screen ?? NSScreen.main)?.visibleFrame.height ?? 1000, max(420, height))
         panel.setFrame(frame, display: true)
     }
 
@@ -151,20 +153,23 @@ import Observation
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             panel.isMovableByWindowBackground = true
             panel.styleMask.insert(.resizable)
-            panel.minSize = NSSize(width: 300, height: 260)
-            panel.maxSize = NSSize(width: 700, height: visible.visibleFrame.height)
+            panel.minSize = NSSize(width: 340, height: 420)
+            panel.maxSize = NSSize(width: 820, height: visible.visibleFrame.height)
             let frameKey = Self.frameKey(for: visible)
             if restoreFrame, let raw = UserDefaults.standard.string(forKey: frameKey) ?? UserDefaults.standard.string(forKey: "pinnedFrame") {
-                let saved = NSRectFromString(raw)
-                if visible.visibleFrame.contains(saved) { panel.setFrame(saved, display: false) }
-                else { panel.setFrame(visible.visibleFrame.insetBy(dx: 20, dy: 20), display: false) }
+                var saved = NSRectFromString(raw)
+                saved.size.width = min(820, max(340, saved.width))
+                saved.size.height = min(visible.visibleFrame.height, max(420, saved.height))
+                saved.origin.x = min(max(visible.visibleFrame.minX, saved.minX), visible.visibleFrame.maxX - saved.width)
+                saved.origin.y = min(max(visible.visibleFrame.minY, saved.minY), visible.visibleFrame.maxY - saved.height)
+                panel.setFrame(saved, display: false)
             }
         } else {
             panel.level = .statusBar
             panel.collectionBehavior = [.transient, .moveToActiveSpace]
             panel.isMovableByWindowBackground = false
             panel.styleMask.remove(.resizable)
-            let width = max(300, UserDefaults.standard.double(forKey: "panelWidth").nonzeroOr(380))
+            let width = min(820, max(340, UserDefaults.standard.double(forKey: "panelWidth").nonzeroOr(420)))
             panel.setContentSize(NSSize(width: width, height: min(visible.visibleFrame.height * 0.8, 640)))
         }
     }

@@ -15,7 +15,7 @@ import SwiftUI
                 SettingsView(tab: tab, tabSelection: tabSelection)
                     .environment(model)
                     .environment(\.locale, model.locale)
-                    .frame(minWidth: 620, minHeight: 520)
+                    .frame(minWidth: 760, minHeight: 560)
             )
             let hostingView = NSHostingView(rootView: root)
             let window = NSWindow(
@@ -26,6 +26,8 @@ import SwiftUI
             )
             window.title = "SiliconPulse Settings"
             window.isReleasedWhenClosed = false
+            window.minSize = NSSize(width: 760, height: 588)
+            window.setFrameAutosaveName("SiliconPulseSettings")
             window.center()
             window.contentView = hostingView
             self.hostingView = hostingView

@@ -7,6 +7,8 @@ struct DashboardView: View {
     @Environment(AppModel.self) private var model
     let panelController: PanelController
 
+    private var category: String { panelController.category }
+
     private var cards: [String] {
         let screenshotRun = ProcessInfo.processInfo.arguments.contains("--release-screenshot")
         let selectedCard = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--release-screenshot-card=") })?.split(separator: "=", maxSplits: 1).last.map(String.init)
@@ -19,107 +21,142 @@ struct DashboardView: View {
             (panelController.editMode || section != "Bluetooth" || !model.snapshot.bluetooth.isEmpty) &&
             (panelController.editMode || section != "Fans" || !model.snapshot.fans.isEmpty)
         }
-        guard panelController.editMode else { return ordered.filter { model.visibleSections.contains($0) } }
+        guard panelController.editMode else { return ordered.filter { model.visibleSections.contains($0) && (category == "Overview" || sectionsForCategory.contains($0)) } }
         return ordered.filter { model.visibleSections.contains($0) } + ordered.filter { !model.visibleSections.contains($0) }
     }
 
+    private var sectionsForCategory: Set<String> {
+        switch category {
+        case "Performance": ["CPU", "GPU", "Memory", "Processes"]
+        case "Energy": ["Battery", "Power", "Thermal", "Fans"]
+        case "System": ["Disk", "Network", "System", "Bluetooth", "Sleep blockers"]
+        default: Set(AppModel.allSections)
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: "waveform.path.ecg").foregroundStyle(.primary)
-                Text("SiliconPulse").font(.headline).foregroundStyle(.primary)
-                if panelController.editMode { Text("Edit Mode").font(.caption).foregroundStyle(.secondary) }
-                Spacer(minLength: 4)
-                Button { OverlayController.active?.toggle() } label: {
-                    Image(systemName: OverlayController.active?.isActive == true ? "rectangle.dashed.badge.record" : "rectangle.dashed")
-                        .foregroundStyle(OverlayController.active?.isActive == true ? Color.accentColor : Color.primary)
-                }.buttonStyle(.plain).frame(width: 28, height: 28).help(Text(OverlayL10n.text("Overlay mode", locale: model.locale))).accessibilityLabel(OverlayL10n.text("Overlay mode", locale: model.locale))
-                Button { panelController.setPinned(!panelController.isPinned) } label: {
-                    Image(systemName: panelController.isPinned ? "pin.fill" : "pin")
-                        .foregroundStyle(panelController.isPinned ? Color.accentColor : Color.primary)
-                }.buttonStyle(.plain).help(panelController.isPinned ? Text("Unpin panel") : Text("Pin panel"))
-                    .accessibilityLabel(panelController.isPinned ? "Unpin panel" : "Pin panel")
-                Button { panelController.editMode.toggle() } label: {
-                    Image(systemName: panelController.editMode ? "checkmark" : "pencil").foregroundStyle(.primary)
-                }.buttonStyle(.plain).help(panelController.editMode ? Text("Done editing") : Text("Edit cards"))
-                    .accessibilityLabel(panelController.editMode ? "Done editing" : "Edit cards")
-                Button { SettingsWindowController.shared.show(model: model) } label: { Image(systemName: "gearshape").foregroundStyle(.primary) }
-                    .buttonStyle(.plain).help(Text("Settings")).accessibilityLabel(Text("Settings"))
-                if panelController.isPinned {
-                    Button { panelController.close() } label: { Image(systemName: "xmark").foregroundStyle(.secondary) }
-                        .buttonStyle(.plain).help(Text("Close panel")).accessibilityLabel("Close panel")
+        GeometryReader { geometry in
+            let wide = geometry.size.width >= 560
+            let short = geometry.size.height < 600
+            VStack(spacing: 0) {
+                header
+                if !panelController.editMode {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Your Mac, at a glance").font(.system(size: short ? 18 : 22, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75)
+                                Text(model.snapshot.system.chip ?? "Apple Silicon").font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                            Label("Live", systemImage: "circle.fill")
+                                .font(.caption.weight(.medium)).foregroundStyle(.green)
+                                .labelStyle(.titleAndIcon)
+                        }
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: wide || short ? 4 : 2), spacing: 10) {
+                            GlanceTile(title: "CPU", value: model.value(for: "CPU %"), points: model.cpuHistory, color: .blue, compact: short)
+                            GlanceTile(title: "GPU", value: model.value(for: "GPU %"), points: model.gpuHistory, color: .teal, compact: short)
+                            GlanceTile(title: "Memory", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple, compact: short)
+                            GlanceTile(title: "Battery W", value: model.value(for: "Battery W"), points: model.batteryPowerHistory, color: .orange, compact: short)
+                        }
+                        Picker("Category", selection: Binding(get: { category }, set: { panelController.category = $0 })) {
+                            ForEach(["Overview", "Performance", "Energy", "System"], id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
+                        }.pickerStyle(.segmented).labelsHidden()
+                    }.padding(18)
                 }
-            }.padding(.horizontal, 16).padding(.vertical, 10)
-                .background { WindowDragHandle(enabled: panelController.isPinned) }
-
-            if !panelController.editMode {
-                HStack(spacing: 5) {
-                    GlanceTile(title: "CPU", value: model.value(for: "CPU %"), points: model.cpuHistory, color: .blue)
-                    GlanceTile(title: "GPU", value: model.value(for: "GPU %"), points: model.gpuHistory, color: .teal)
-                    GlanceTile(title: "RAM", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple)
-                    GlanceTile(title: "Battery W", value: model.value(for: "Battery W"), points: model.batteryPowerHistory, color: .orange)
-                }.padding(.horizontal, 10).padding(.bottom, 8)
-                    .background { WindowDragHandle(enabled: panelController.isPinned) }
-            }
-
-            ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(cards, id: \.self) { title in
-                        CardView(title: title, isHidden: !model.visibleSections.contains(title), editMode: panelController.editMode)
-                            .onDrop(of: [UTType.plainText], delegate: SectionDropDelegate(section: title, model: model))
-                    }
+                Divider()
+                ScrollView {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: wide && !panelController.editMode ? 2 : 1), alignment: .leading, spacing: 12) {
+                        ForEach(cards, id: \.self) { title in
+                            CardView(title: title, isHidden: !model.visibleSections.contains(title), editMode: panelController.editMode, expansion: Binding(get: { category == "Overview" ? panelController.overviewExpanded.contains(title) : model.expanded.contains(title) }, set: { value in
+                                    if category == "Overview" { if value { panelController.overviewExpanded.insert(title) } else { panelController.overviewExpanded.remove(title) } }
+                                    else { if value { model.expanded.insert(title) } else { model.expanded.remove(title) } }
+                                }))
+                                .onDrop(of: [UTType.plainText], delegate: SectionDropDelegate(section: title, model: model, enabled: panelController.editMode))
+                        }
+                    }.padding(16)
+                    if cards.isEmpty { ContentUnavailableView("No visible sections", systemImage: "rectangle.3.group", description: Text("Use Edit cards to choose what appears here.")) }
                     if panelController.editMode {
                         Button("Reset layout…") { panelController.showLayoutResetConfirmation = true }
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 8)
+                            .padding(.bottom, 16)
                             .confirmationDialog("Reset card layout?", isPresented: Binding(get: { panelController.showLayoutResetConfirmation }, set: { panelController.showLayoutResetConfirmation = $0 }), titleVisibility: .visible) {
-                                Button("Reset Layout", role: .destructive) { model.resetLayout() }
+                                Button("Reset Layout", role: .destructive) { model.resetLayout(); panelController.overviewExpanded.removeAll() }
                             } message: { Text("Restore the default card order, visibility, and expanded state.") }
                     }
-                }.frame(maxWidth: .infinity, alignment: .top).padding(10)
-            }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
-
-            HStack(spacing: 8) {
-                Text(model.snapshot.system.chip ?? "Apple Silicon").lineLimit(1)
-                Spacer(minLength: 4)
-                Text("macOS \(model.snapshot.system.macOS)").lineLimit(1)
-                Button("Copy snapshot") { model.copySnapshot() }.buttonStyle(.plain).foregroundStyle(.secondary)
-                Button("Quit") { NSApplication.shared.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
-                if panelController.isPinned {
-                    Image(systemName: "window.resize.bottomright").font(.caption).foregroundStyle(.tertiary)
-                        .frame(width: 14, height: 14).gesture(DragGesture(minimumDistance: 1)
-                            .onChanged { value in
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                Divider()
+                HStack(spacing: 12) {
+                    Image(systemName: "lock.shield").foregroundStyle(.secondary)
+                    Text("On-device monitoring").lineLimit(1)
+                    Spacer(minLength: 0)
+                    Button { model.copySnapshot() } label: { Image(systemName: "doc.on.doc") }
+                        .help("Copy snapshot").accessibilityLabel("Copy snapshot")
+                    Menu { Button("Quit SiliconPulse") { NSApp.terminate(nil) } } label: { Image(systemName: "ellipsis.circle") }
+                        .menuStyle(.borderlessButton).fixedSize().accessibilityLabel("More actions")
+                    if panelController.isPinned {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right").foregroundStyle(.tertiary)
+                            .gesture(DragGesture(minimumDistance: 1).onChanged { value in
                                 if panelController.resizeStartSize == nil { panelController.resizeStartSize = panelController.panel.frame.size }
-                                guard let start = panelController.resizeStartSize else { return }
-                                panelController.resizePanel(width: start.width + value.translation.width, height: start.height - value.translation.height)
+                                if let start = panelController.resizeStartSize { panelController.resizePanel(width: start.width + value.translation.width, height: start.height - value.translation.height) }
                             }.onEnded { _ in panelController.resizeStartSize = nil })
-                        .accessibilityLabel("Resize panel")
-                }
-            }.font(.caption2).foregroundStyle(.secondary).padding(10)
-        }
-        .frame(minWidth: 300, idealWidth: 380, maxWidth: .infinity, minHeight: 260, maxHeight: .infinity)
-        .background {
-            ZStack {
-                Rectangle().fill(.regularMaterial)
-                Color(nsColor: .windowBackgroundColor).opacity(0.75)
+                            .accessibilityLabel("Resize panel")
+                    }
+                }.buttonStyle(.plain).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 18).padding(.vertical, 12)
             }
         }
-        .opacity(model.panelOpacity)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(minWidth: 340, idealWidth: 420, maxWidth: .infinity, minHeight: 420, maxHeight: .infinity)
+        .background { ZStack { Rectangle().fill(.regularMaterial); Color(nsColor: .windowBackgroundColor).opacity(0.88) } }
+        .opacity(panelController.isPinned ? model.panelOpacity : 1)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.primary.opacity(0.08), lineWidth: 1))
         .environment(\.locale, model.locale)
     }
+
+    private var header: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "waveform.path.ecg").font(.system(size: 15, weight: .semibold)).foregroundStyle(.blue)
+                .frame(width: 30, height: 30).background(.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+            Text("SiliconPulse").font(.system(size: 14, weight: .semibold))
+            Spacer(minLength: 0)
+            Button { OverlayController.active?.toggle() } label: { Image(systemName: "rectangle.dashed") }
+                .help(Text(OverlayL10n.text("Overlay mode", locale: model.locale))).accessibilityLabel(OverlayL10n.text("Overlay mode", locale: model.locale))
+            Button { panelController.setPinned(!panelController.isPinned) } label: {
+                Image(systemName: panelController.isPinned ? "pin.fill" : "pin").foregroundStyle(panelController.isPinned ? Color.blue : Color.secondary)
+            }.help(panelController.isPinned ? Text("Unpin panel") : Text("Pin panel"))
+                .accessibilityLabel(panelController.isPinned ? "Unpin panel" : "Pin panel")
+            Button { panelController.editMode.toggle() } label: { Image(systemName: panelController.editMode ? "checkmark.circle.fill" : "slider.horizontal.3") }
+                .help(panelController.editMode ? Text("Done editing") : Text("Edit cards"))
+                .accessibilityLabel(panelController.editMode ? "Done editing" : "Edit cards")
+            Button { SettingsWindowController.shared.show(model: model) } label: { Image(systemName: "gearshape") }
+                .keyboardShortcut(",", modifiers: .command).help("Settings").accessibilityLabel("Settings")
+            if panelController.isPinned {
+                Button { panelController.close() } label: { Image(systemName: "xmark") }.accessibilityLabel("Close panel")
+            }
+        }.buttonStyle(PanelToolStyle()).padding(.horizontal, 16).padding(.vertical, 12)
+            .background { WindowDragHandle(enabled: panelController.isPinned) }
+    }
+}
+
+private struct PanelToolStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
+            .frame(width: 22, height: 28)
+            .background(configuration.isPressed ? Color.primary.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 6))
+    }
+
 }
 
 private struct SectionDropDelegate: DropDelegate {
     let section: String
     let model: AppModel
+    let enabled: Bool
     func dropEntered(info: DropInfo) {
-        guard let provider = info.itemProviders(for: [UTType.plainText]).first else { return }
+        guard enabled, let provider = info.itemProviders(for: [UTType.plainText]).first else { return }
         _ = provider.loadObject(ofClass: NSString.self) { value, _ in
             guard let value = value as? String else { return }
             Task { @MainActor in model.moveSection(value, before: section) }
         }
     }
-    func performDrop(info: DropInfo) -> Bool { true }
+    func performDrop(info: DropInfo) -> Bool { enabled }
 }
 
 private struct GlanceTile: View {
@@ -127,15 +164,24 @@ private struct GlanceTile: View {
     let value: String
     let points: [TelemetryPoint]
     let color: Color
+    var compact = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(LocalizedStringKey(title)).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 11, weight: .semibold, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
-            Chart(points) { point in if let sample = point.value { LineMark(x: .value("Time", point.id), y: .value(title, sample)).foregroundStyle(color) } }
-                .chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 15).transaction { $0.animation = nil }
-        }
-        .frame(maxWidth: .infinity).frame(height: 48, alignment: .leading).padding(5)
-        .background(.background.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 5) {
+                Circle().fill(color).frame(width: 5, height: 5)
+                Text(LocalizedStringKey(title)).font(.caption.weight(.medium)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+            }
+            Text(value).font(.system(size: compact ? 15 : 25, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
+            Chart(points) { point in
+                if let sample = point.value {
+                    AreaMark(x: .value("Time", point.id), y: .value(title, sample)).foregroundStyle(LinearGradient(colors: [color.opacity(0.18), color.opacity(0.01)], startPoint: .top, endPoint: .bottom))
+                    LineMark(x: .value("Time", point.id), y: .value(title, sample)).foregroundStyle(color).lineStyle(StrokeStyle(lineWidth: 1.5))
+                }
+            }.chartXAxis(.hidden).chartYAxis(.hidden).frame(height: compact ? 14 : 24).transaction { $0.animation = nil }
+                .accessibilityLabel(Text("\(title) history"))
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(compact ? 8 : 13)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(color.opacity(0.12), lineWidth: 1))
     }
 }
 
@@ -144,6 +190,8 @@ private struct CardView: View {
     let title: String
     let isHidden: Bool
     let editMode: Bool
+    let expansion: Binding<Bool>
+    private var isExpanded: Bool { expansion.wrappedValue }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -159,14 +207,14 @@ private struct CardView: View {
                 }
                 Button {
                     guard !editMode else { return }
-                    if model.expanded.contains(title) { model.expanded.remove(title) } else { model.expanded.insert(title) }
+                    expansion.wrappedValue.toggle()
                 } label: {
                     HStack {
-                        Image(systemName: icon).foregroundStyle(.primary).frame(width: 20)
+                        Image(systemName: icon).foregroundStyle(tint).frame(width: 28, height: 28).background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
                         Text(LocalizedStringKey(title)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                        if !editMode && !model.expanded.contains(title) { Text(summary(for: title)).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+
                         Spacer(minLength: 3)
-                        if !editMode { Image(systemName: model.expanded.contains(title) ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(.secondary) }
+                        if !editMode { Image(systemName: isExpanded ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(.secondary) }
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityAddTraits(.isButton)
                 if editMode {
@@ -175,15 +223,25 @@ private struct CardView: View {
                     }.buttonStyle(.plain).help(isHidden ? Text("Show card") : Text("Hide card"))
                         .accessibilityLabel(isHidden ? "Show \(title)" : "Hide \(title)")
                 }
-            }.frame(maxWidth: .infinity, minHeight: 36, alignment: .leading).padding(.horizontal, 10)
-            if !editMode && model.expanded.contains(title) {
+            }.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading).padding(.horizontal, 14)
+            if !editMode && !isExpanded {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(summary(for: title)).font(.system(size: 25, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+                    Spacer(minLength: 0)
+                    Text(LocalizedStringKey(previewCaption)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }.padding(.horizontal, 14).padding(.bottom, 16)
+            }
+            if !editMode && isExpanded {
                 Divider().padding(.horizontal, 10)
-                content.frame(maxWidth: .infinity, alignment: .leading).padding(10)
+                content.frame(maxWidth: .infinity, alignment: .leading).padding(14)
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
             .opacity(isHidden ? 0.48 : 1)
-            .background(.background.opacity(0.85), in: RoundedRectangle(cornerRadius: 12))
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(.quaternary, lineWidth: 0.5))
+    }
+    private var tint: Color {
+        switch title { case "CPU", "Processes": .blue; case "GPU", "Network": .teal; case "Memory", "Disk": .purple; case "Battery": .green; case "Power", "Thermal", "Fans": .orange; default: .secondary }
     }
     private var icon: String {
         ["Battery":"battery.100percent", "Power":"bolt.fill", "GPU":"display", "CPU":"cpu", "Memory":"memorychip", "Disk":"internaldrive", "Network":"wifi", "Thermal":"thermometer.medium", "Processes":"list.number", "Sleep blockers":"moon.zzz", "System":"desktopcomputer", "Bluetooth":"headphones", "Fans":"fanblades"][title] ?? "circle"
@@ -218,7 +276,28 @@ private struct CardView: View {
         case "Battery": return model.value(for: "Battery %")
         case "Power": return model.value(for: "Power W")
         case "Disk": return model.formatRate(model.snapshot.diskIO.readBytesPerSecond)
-        default: return ""
+        case "Thermal": return thermalName
+        case "Processes": return DisplayValue.number(model.snapshot.cpu.processCount)
+        case "System": return model.snapshot.system.chip ?? "Apple Silicon"
+        case "Sleep blockers": return String(model.snapshot.sleepBlockers.count)
+        case "Bluetooth": return String(model.snapshot.bluetooth.count)
+        case "Fans": return String(model.snapshot.fans.count)
+        default: return "n/a"
+        }
+    }
+
+    private var previewCaption: String {
+        switch title {
+        case "CPU", "GPU": "Utilization"
+        case "Memory": "Used"
+        case "Battery": batteryStatus
+        case "Power": "Combined"
+        case "Disk": "Read"
+        case "Network": "Transfer"
+        case "Thermal": "Thermal state"
+        case "Processes": "Processes"
+        case "Sleep blockers": "Active"
+        default: ""
         }
     }
 
@@ -283,7 +362,7 @@ private struct CardView: View {
     }
     private var cpu: some View {
         VStack(spacing: 6) {
-            HStack { Text("Total"); Spacer(); Text(DisplayValue.decimal(model.snapshot.cpu.load.map { $0 * 100 }, suffix: "%")).monospacedDigit() }
+            HStack { Text("Total").foregroundStyle(.secondary); Spacer(); Text(DisplayValue.decimal(model.snapshot.cpu.load.map { $0 * 100 }, suffix: "%")).font(.system(size: 27, weight: .semibold)).monospacedDigit() }
             rows([("User", DisplayValue.decimal(model.snapshot.cpu.user, digits: 0, suffix: "%")), ("System", DisplayValue.decimal(model.snapshot.cpu.system, digits: 0, suffix: "%")), ("Idle", DisplayValue.decimal(model.snapshot.cpu.idle, digits: 0, suffix: "%")), ("Load average 1 / 5 / 15", model.snapshot.cpu.loadAverage.map { DisplayValue.decimal($0, digits: 2) }.joined(separator: " / ").isEmpty ? "n/a" : model.snapshot.cpu.loadAverage.map { DisplayValue.decimal($0, digits: 2) }.joined(separator: " / ")), ("Processes", DisplayValue.number(model.snapshot.cpu.processCount))])
             HStack(spacing: 8) { clusterBar("E", value: model.snapshot.cpu.eAverage, tint: .teal); clusterBar("P", value: model.snapshot.cpu.pAverage, tint: .orange) }
             Chart(model.cpuHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("CPU", value)).foregroundStyle(.tint) } }
@@ -387,7 +466,7 @@ private struct CardView: View {
         }
     }
     private var system: some View {
-        rows([("Model name", model.snapshot.system.chip ?? "n/a"), ("Model identifier", model.snapshot.system.model ?? "n/a"), ("Chip", model.snapshot.system.chip ?? "n/a"), ("E cores", DisplayValue.number(model.snapshot.system.eCores)), ("P cores", DisplayValue.number(model.snapshot.system.pCores)), ("GPU cores", DisplayValue.number(model.snapshot.system.gpuCores)), ("Model name", model.snapshot.system.chip ?? "n/a"), ("RAM", model.snapshot.system.memoryGB.map { model.formatBytes(UInt64($0 * 1_000_000_000)) } ?? "n/a"), ("macOS", model.snapshot.system.macOS), ("Build", model.snapshot.system.build ?? "n/a"), ("Uptime", DisplayValue.duration(model.snapshot.system.uptime)), ("Boot time", model.snapshot.system.bootTime?.formatted(date: .abbreviated, time: .shortened) ?? "n/a")])
+        rows([("Model name", model.snapshot.system.chip ?? "n/a"), ("Model identifier", model.snapshot.system.model ?? "n/a"), ("Chip", model.snapshot.system.chip ?? "n/a"), ("E cores", DisplayValue.number(model.snapshot.system.eCores)), ("P cores", DisplayValue.number(model.snapshot.system.pCores)), ("GPU cores", DisplayValue.number(model.snapshot.system.gpuCores)), ("RAM", model.snapshot.system.memoryGB.map { model.formatBytes(UInt64($0 * 1_000_000_000)) } ?? "n/a"), ("macOS", model.snapshot.system.macOS), ("Build", model.snapshot.system.build ?? "n/a"), ("Uptime", DisplayValue.duration(model.snapshot.system.uptime)), ("Boot time", model.snapshot.system.bootTime?.formatted(date: .abbreviated, time: .shortened) ?? "n/a")])
     }
     private func rows(_ entries: [(String, String)]) -> some View {
         VStack(spacing: model.compactRows ? 2 : 5) {

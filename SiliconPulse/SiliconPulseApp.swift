@@ -21,6 +21,25 @@ import AppKit
         let args = ProcessInfo.processInfo.arguments
         NSApplication.shared.setActivationPolicy(UserDefaults.standard.bool(forKey: "showDockIcon") ? .regular : .accessory)
         let model = AppModel.shared
+        model.applyAppearance()
+        if let snapshotArg = args.first(where: { $0.hasPrefix("--ui-snapshot=") }) {
+            let domain = Bundle.main.bundleIdentifier ?? "io.github.leonsuv.SiliconPulse"
+            let saved = UserDefaults.standard.persistentDomain(forName: domain) ?? [:]
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.panelController.show()
+                model.setPopoverOpen(true)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
+                guard let self else { return }
+                var succeeded = true
+                do {
+                    try InterfaceRenderQA.render(model: model, panel: self.panelController, to: String(snapshotArg.dropFirst("--ui-snapshot=".count)))
+                } catch { succeeded = false; fputs("UI_RENDER_FAILED: \(error)\n", stderr) }
+                UserDefaults.standard.setPersistentDomain(saved, forName: domain)
+                UserDefaults.standard.synchronize()
+                exit(succeeded ? 0 : 1)
+            }
+        }
         if args.contains("--release-screenshot-de") { model.language = "de" }
         else if args.contains("--release-screenshot-en") || args.contains("--release-screenshot") { model.language = "en" }
         if args.contains("--release-screenshot") {

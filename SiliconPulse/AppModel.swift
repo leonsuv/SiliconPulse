@@ -26,6 +26,11 @@ import UserNotifications
     var menuMetrics: [String] = UserDefaults.standard.stringArray(forKey: "menuMetrics") ?? ["Battery %"] {
         didSet { UserDefaults.standard.set(menuMetrics, forKey: "menuMetrics"); onMenuLabelUpdate?() }
     }
+    var appearance = UserDefaults.standard.string(forKey: "appearance") ?? "System" {
+        didSet { UserDefaults.standard.set(appearance, forKey: "appearance"); applyAppearance() }
+    }
+    func applyAppearance() { NSApp.appearance = appearance == "System" ? nil : NSAppearance(named: appearance == "Dark" ? .darkAqua : .aqua) }
+
     var language = UserDefaults.standard.string(forKey: "appLanguage") ?? "System" { didSet { UserDefaults.standard.set(language, forKey: "appLanguage") } }
     var locale: Locale { Locale(identifier: language == "System" ? Locale.current.identifier : language) }
     var enableHIDTemps = UserDefaults.standard.object(forKey: "enableHIDTemps") as? Bool ?? true {

@@ -2,7 +2,7 @@
 
 Live Apple Silicon telemetry in your menu bar.
 
-![SiliconPulse hero](docs/assets/hero.jpg)
+
 
 [![Latest release](https://img.shields.io/github/v/release/leonsuv/SiliconPulse?display_name=tag)](https://github.com/leonsuv/SiliconPulse/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/leonsuv/SiliconPulse/total)](https://github.com/leonsuv/SiliconPulse/releases)
@@ -19,49 +19,20 @@ SiliconPulse is a native macOS menu bar monitor for Apple Silicon. Its dashboard
 
 ## Screenshots
 
-### Dashboard
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/dashboard-wide-dark.png">
+  <img alt="SiliconPulse 1.1 dashboard" src="docs/assets/screenshots/dashboard-wide-light.png" width="900">
+</picture>
 
-| Overview | At a glance | Battery | Power |
-|---|---|---|---|
-| ![Dashboard overview](docs/assets/screenshots/panel-overview.jpg) | ![At-a-glance tiles](docs/assets/screenshots/at-a-glance.jpg) | ![Battery card](docs/assets/screenshots/card-battery.jpg) | ![Power card](docs/assets/screenshots/card-power.jpg) |
+| Compact panel | Performance details | Settings |
+|---|---|---|
+| ![Panel](docs/assets/screenshots/dashboard-light.png) | ![Performance](docs/assets/screenshots/performance-light.png) | ![Settings](docs/assets/screenshots/settings-0-light.png) |
 
-| GPU | CPU | Memory | Disk |
-|---|---|---|---|
-| ![GPU card](docs/assets/screenshots/card-gpu.jpg) | ![CPU card](docs/assets/screenshots/card-cpu.jpg) | ![Memory card](docs/assets/screenshots/card-memory.jpg) | ![Disk card](docs/assets/screenshots/card-disk.jpg) |
-
-| Network | Thermal | Processes | System |
-|---|---|---|---|
-| ![Network card](docs/assets/screenshots/card-network.jpg) | ![Thermal card](docs/assets/screenshots/card-thermal.jpg) | ![Processes card](docs/assets/screenshots/card-processes.jpg) | ![System card](docs/assets/screenshots/card-system.jpg) |
-
-| Sleep blockers | Bluetooth | Fans | Edit mode |
-|---|---|---|---|
-| ![Sleep blockers card](docs/assets/screenshots/card-sleep-blockers.jpg) | ![Bluetooth card](docs/assets/screenshots/card-bluetooth.jpg) | ![Fans card](docs/assets/screenshots/card-fans.jpg) | ![Edit mode](docs/assets/screenshots/panel-edit-mode.jpg) |
-
-### Pinned panel and overlay
-
-| Pinned compact | Pinned large | Overlay List on a bright background | Overlay List on a dark background |
-|---|---|---|---|
-| ![Compact pinned panel](docs/assets/screenshots/panel-pinned-compact.jpg) | ![Large pinned panel](docs/assets/screenshots/panel-pinned-large.jpg) | ![List overlay on bright background](docs/assets/screenshots/overlay-list-bright.jpg) | ![List overlay on dark background](docs/assets/screenshots/overlay-list-dark.jpg) |
-
-| Overlay Bar on a bright background | Overlay Bar on a dark background |
-|---|---|
-| ![Bar overlay on bright background](docs/assets/screenshots/overlay-bar-bright.jpg) | ![Bar overlay on dark background](docs/assets/screenshots/overlay-bar-dark.jpg) |
-
-### Settings
-
-| General | Menu bar | Sections | Units |
-|---|---|---|---|
-| ![General settings](docs/assets/screenshots/settings-tab-0.jpg) | ![Menu bar settings](docs/assets/screenshots/settings-tab-1.jpg) | ![Section settings](docs/assets/screenshots/settings-tab-2.jpg) | ![Units settings](docs/assets/screenshots/settings-tab-3.jpg) |
-
-| Notifications | Advanced | Overlay | Einstellungen auf Deutsch |
-|---|---|---|---|
-| ![Notification settings](docs/assets/screenshots/settings-tab-4.jpg) | ![Advanced settings](docs/assets/screenshots/settings-tab-5.jpg) | ![Overlay settings](docs/assets/screenshots/settings-tab-6.jpg) | ![Allgemeine Einstellungen auf Deutsch](docs/assets/screenshots/settings-general-de.jpg) |
-
-The screenshots are captured from SiliconPulse windows on a Mac. They show live values that vary by machine and time.
+Screenshots show the production app views with real locally sampled telemetry. Readings vary by Mac and time. Choose System, Light, or Dark under **General → Appearance**.
 
 ## Install
 
-1. Download [SiliconPulse-1.0.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.0.0.zip) from GitHub Releases.
+1. Download [SiliconPulse-1.1.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.1.0.zip) from GitHub Releases.
 2. Unzip it and move `SiliconPulse.app` to `/Applications`.
 3. The app is ad-hoc signed and not notarized. On first launch, Control-click it and choose **Open**, or use **System Settings → Privacy & Security → Open Anyway**. Alternatively, remove quarantine yourself:
 
@@ -83,6 +54,9 @@ open SiliconPulse.app
 The script builds the Swift package, assembles an `LSUIElement` app bundle, copies its local icon and language resources, and ad-hoc signs the app. App Sandbox is not enabled.
 
 ## Use SiliconPulse
+
+The overview shows the key readings. Expand a card for details, or select Performance, Energy, or System. Pinned panels use two columns at widths of 560 points and above.
+
 
 - Click the status item to open or close the dashboard. Settings lets you choose which readings appear in the menu bar.
 - Pin the panel to keep it visible across app changes and Spaces. Drag its header to move it and use the resize handle to change its size.
@@ -147,3 +121,14 @@ Measurements below are from an Apple Silicon Mac running this release candidate.
 ## License
 
 SiliconPulse is available under the [MIT License](LICENSE).
+
+## Interface verification
+
+```sh
+./build.sh
+./scripts/check-interface.sh
+```
+
+Renders the compact and wide panels and all seven settings sections in light and dark from the app views. The run restores existing preferences afterward.
+
+[UI validation](docs/UI-VALIDATION.md) · [Changelog](CHANGELOG.md)

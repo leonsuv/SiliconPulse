@@ -2,7 +2,7 @@
 
 Live-Telemetrie für Apple Silicon in deiner Menüleiste.
 
-![SiliconPulse Titelbild](docs/assets/hero.jpg)
+
 
 [![Neueste Version](https://img.shields.io/github/v/release/leonsuv/SiliconPulse?display_name=tag)](https://github.com/leonsuv/SiliconPulse/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/leonsuv/SiliconPulse/total)](https://github.com/leonsuv/SiliconPulse/releases)
@@ -19,49 +19,20 @@ SiliconPulse ist ein nativer macOS-Menüleistenmonitor für Apple Silicon. Dashb
 
 ## Screenshots
 
-### Dashboard
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/dashboard-wide-dark.png">
+  <img alt="SiliconPulse 1.1 dashboard" src="docs/assets/screenshots/dashboard-wide-light.png" width="900">
+</picture>
 
-| Übersicht | Momentaufnahme | Batterie | Leistung |
-|---|---|---|---|
-| ![Dashboard-Übersicht](docs/assets/screenshots/panel-overview-de.jpg) | ![Momentaufnahme](docs/assets/screenshots/at-a-glance.jpg) | ![Batteriekarte](docs/assets/screenshots/card-battery.jpg) | ![Leistungskarte](docs/assets/screenshots/card-power.jpg) |
+| Kompaktes Panel | Leistung im Detail | Einstellungen |
+|---|---|---|
+| ![Panel](docs/assets/screenshots/dashboard-dark.png) | ![Leistung](docs/assets/screenshots/performance-dark.png) | ![Einstellungen](docs/assets/screenshots/settings-0-dark.png) |
 
-| GPU | CPU | Arbeitsspeicher | Datenträger |
-|---|---|---|---|
-| ![GPU-Karte](docs/assets/screenshots/card-gpu.jpg) | ![CPU-Karte](docs/assets/screenshots/card-cpu.jpg) | ![Speicherkarte](docs/assets/screenshots/card-memory.jpg) | ![Datenträgerkarte](docs/assets/screenshots/card-disk.jpg) |
-
-| Netzwerk | Temperatur | Prozesse | System |
-|---|---|---|---|
-| ![Netzwerkkarte](docs/assets/screenshots/card-network.jpg) | ![Temperaturkarte](docs/assets/screenshots/card-thermal.jpg) | ![Prozesskarte](docs/assets/screenshots/card-processes.jpg) | ![Systemkarte](docs/assets/screenshots/card-system.jpg) |
-
-| Ruhezustandsblocker | Bluetooth | Lüfter | Bearbeitungsmodus |
-|---|---|---|---|
-| ![Ruhezustandsblocker](docs/assets/screenshots/card-sleep-blockers.jpg) | ![Bluetooth-Karte](docs/assets/screenshots/card-bluetooth.jpg) | ![Lüfterkarte](docs/assets/screenshots/card-fans.jpg) | ![Bearbeitungsmodus](docs/assets/screenshots/panel-edit-mode.jpg) |
-
-### Angeheftetes Fenster und Overlay
-
-| Kompakt angeheftet | Groß angeheftet | Listen-Overlay, heller Hintergrund | Listen-Overlay, dunkler Hintergrund |
-|---|---|---|---|
-| ![Kompaktes Fenster](docs/assets/screenshots/panel-pinned-compact.jpg) | ![Großes Fenster](docs/assets/screenshots/panel-pinned-large.jpg) | ![Listen-Overlay hell](docs/assets/screenshots/overlay-list-bright.jpg) | ![Listen-Overlay dunkel](docs/assets/screenshots/overlay-list-dark.jpg) |
-
-| Balken-Overlay, heller Hintergrund | Balken-Overlay, dunkler Hintergrund |
-|---|---|
-| ![Balken-Overlay hell](docs/assets/screenshots/overlay-bar-bright.jpg) | ![Balken-Overlay dunkel](docs/assets/screenshots/overlay-bar-dark.jpg) |
-
-### Einstellungen
-
-| Allgemein | Menüleiste | Bereiche | Einheiten |
-|---|---|---|---|
-| ![Allgemeine Einstellungen](docs/assets/screenshots/settings-tab-0.jpg) | ![Menüleisteneinstellungen](docs/assets/screenshots/settings-tab-1.jpg) | ![Bereichseinstellungen](docs/assets/screenshots/settings-tab-2.jpg) | ![Einheiten](docs/assets/screenshots/settings-tab-3.jpg) |
-
-| Mitteilungen | Erweitert | Overlay | Deutsch |
-|---|---|---|---|
-| ![Mitteilungen](docs/assets/screenshots/settings-tab-4.jpg) | ![Erweiterte Einstellungen](docs/assets/screenshots/settings-tab-5.jpg) | ![Overlay-Einstellungen](docs/assets/screenshots/settings-tab-6.jpg) | ![Allgemeines Fenster auf Deutsch](docs/assets/screenshots/settings-general-de.jpg) |
-
-Die Screenshots stammen von SiliconPulse-Fenstern auf einem Mac. Messwerte ändern sich je nach Gerät und Zeitpunkt.
+Die Screenshots zeigen die echten App-Views mit lokal gemessenen Werten. Messwerte variieren je nach Mac und Zeitpunkt. Hell/Dunkel lässt sich unter **Allgemein → Darstellung** wählen.
 
 ## Installation
 
-1. Lade [SiliconPulse-1.0.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.0.0.zip) aus den GitHub Releases herunter.
+1. Lade [SiliconPulse-1.1.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.1.0.zip) aus den GitHub Releases herunter.
 2. Entpacke die Datei und verschiebe `SiliconPulse.app` nach `/Applications`.
 3. Die App ist ad-hoc signiert und nicht notarisiert. Klicke beim ersten Start mit gedrückter Ctrl-Taste auf die App und wähle **Öffnen** oder nutze **Systemeinstellungen → Datenschutz & Sicherheit → Dennoch öffnen**. Alternativ kannst du das Quarantäne-Attribut entfernen:
 
@@ -147,3 +118,14 @@ Die folgenden Messungen stammen von einem Apple-Silicon-Mac mit diesem Release-K
 ## Lizenz
 
 SiliconPulse steht unter der [MIT-Lizenz](LICENSE).
+
+## Oberfläche prüfen
+
+```sh
+./build.sh
+./scripts/check-interface.sh
+```
+
+Rendert das kompakte und breite Panel sowie alle sieben Einstellungsbereiche in Hell/Dunkel aus den App-Views. Vorhandene Einstellungen werden nach dem Prüflauf wiederhergestellt.
+
+[UI validation](docs/UI-VALIDATION.md) · [Changelog](CHANGELOG.md)
