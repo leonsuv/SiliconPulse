@@ -18,8 +18,15 @@ import AppKit
     private var rightClickRecognizer: NSClickGestureRecognizer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let args = ProcessInfo.processInfo.arguments
         NSApplication.shared.setActivationPolicy(UserDefaults.standard.bool(forKey: "showDockIcon") ? .regular : .accessory)
         let model = AppModel.shared
+        if args.contains("--release-screenshot-de") { model.language = "de" }
+        else if args.contains("--release-screenshot-en") || args.contains("--release-screenshot") { model.language = "en" }
+        if args.contains("--release-screenshot") {
+            model.visibleSections = Set(AppModel.allSections)
+            model.expanded = Set(AppModel.allSections)
+        }
         model.snapshot.system = SystemCollector().collect()
         panelController = PanelController(model: model)
         overlayController = OverlayController(model: model, panelController: panelController)
@@ -44,7 +51,6 @@ import AppKit
         else if (UserDefaults.standard.object(forKey: "reopenPinnedAtLaunch") as? Bool ?? true), panelController.isPinned {
             panelController.show()
         }
-        let args = ProcessInfo.processInfo.arguments
         if args.contains("--pin-qa-relaunch") {
             panelController.panel.qaLogging = true
             panelController.panel.logPinState("launch-restored")
@@ -83,6 +89,49 @@ import AppKit
                 }
             }
         }
+        if args.contains("--settings-qa-open") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                guard let self else { return }
+                self.panelController.openSettings()
+                print("SETTINGS_WINDOW_OPEN=\(SettingsWindowController.shared.currentWindow?.isVisible == true)")
+                fflush(stdout)
+            }
+        }
+        if let tabArgument = args.first(where: { $0.hasPrefix("--settings-qa-tab=") }),
+           let tab = Int(tabArgument.split(separator: "=").last ?? "0") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                SettingsWindowController.shared.show(model: model, tab: tab)
+                print("SETTINGS_WINDOW_OPEN=\(SettingsWindowController.shared.currentWindow?.isVisible == true) TAB=\(tab)")
+                fflush(stdout)
+            }
+        }
+        if args.contains("--release-screenshot-panel") || args.contains(where: { $0.hasPrefix("--release-screenshot-card=") }) || args.contains(where: { $0.hasPrefix("--release-screenshot-pinned=") }) || args.contains("--release-screenshot-edit") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                guard let self else { return }
+                let selectedCard = args.first(where: { $0.hasPrefix("--release-screenshot-card=") })?.split(separator: "=", maxSplits: 1).last.map(String.init)
+                if selectedCard == "Bluetooth" || selectedCard == "Fans" { self.panelController.editMode = true }
+                if let pinArgument = args.first(where: { $0.hasPrefix("--release-screenshot-pinned=") }) {
+                    self.panelController.setPinned(true)
+                    let sizeName = String(pinArgument.split(separator: "=", maxSplits: 1).last ?? "compact")
+                    if sizeName == "large" { self.panelController.resizePanel(width: 620, height: 780) }
+                    else { self.panelController.resizePanel(width: 380, height: 520) }
+                }
+                if args.contains("--release-screenshot-edit") { self.panelController.editMode = true }
+                self.panelController.show()
+            }
+        }
+        if args.contains(where: { $0.hasPrefix("--release-screenshot-overlay=") }) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.overlayController.activate() }
+        }
+        if args.contains("--diagnostic-dump") {
+            model.setPopoverOpen(true)
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                print(model.diagnosticDump())
+                fflush(stdout)
+                NSApplication.shared.terminate(nil)
+            }
+        }
     }
     func applicationWillTerminate(_ notification: Notification) { panelController.persistFrame() }
 
@@ -98,6 +147,11 @@ import AppKit
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
+        if overlayController.isActive {
+            let overlaySettings = NSMenuItem(title: "Overlay Settings…", action: #selector(openSettings), keyEquivalent: "")
+            overlaySettings.target = self
+            menu.addItem(overlaySettings)
+        }
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit SiliconPulse", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
@@ -109,8 +163,7 @@ import AppKit
     @objc private func toggleOverlay() { overlayController.toggle() }
     @objc private func moveOverlay() { overlayController.beginMoveMode() }
     @objc private func openSettings() {
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        SettingsWindowController.shared.show(model: AppModel.shared)
     }
     @objc private func quit() { NSApplication.shared.terminate(nil) }
 

@@ -92,7 +92,7 @@ import Observation
         panel.minSize = NSSize(width: 300, height: 260)
         panel.maxSize = NSSize(width: 700, height: screen.visibleFrame.height)
         panel.pinState = { [weak self] in self?.isPinned ?? false }
-        let root = DashboardView(panelController: self, onSettings: { [weak self] in self?.openSettings() })
+        let root = DashboardView(panelController: self)
             .environment(model).environment(\.locale, model.locale)
         panel.contentView = NSHostingView(rootView: root)
         panel.observeOcclusion()
@@ -126,8 +126,7 @@ import Observation
     }
 
     func openSettings() {
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        SettingsWindowController.shared.show(model: model)
     }
 
     func setWidth(_ width: CGFloat) {

@@ -10,7 +10,6 @@ struct OverlayView: View {
         switch prefs.accent { case "Blue": .blue; case "Green": .green; case "Orange": .orange; case "Purple": .purple; default: .accentColor }
     }
     var body: some View {
-        let _ = model.overlayTick
         VStack(alignment: .leading, spacing: 0) {
             if prefs.hint && Date.now.timeIntervalSince(controller.enteredAt) < 4 {
                 HStack(spacing: 6) {
@@ -18,8 +17,8 @@ struct OverlayView: View {
                     Text(OverlayL10n.text("Overlay on: press %@ to exit", locale: locale).replacingOccurrences(of: "%@", with: prefs.hotKey))
                 }
                 .font(.system(size: 11 * prefs.scale, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.9))
-                .shadow(color: .black.opacity(0.6), radius: 2, y: 1)
+                .foregroundStyle(.white.opacity(max(0.9, prefs.textOpacity)))
+                .shadow(color: .black.opacity(0.95), radius: 2, y: 1)
                 .padding(.bottom, 3 * prefs.scale)
             }
             if prefs.layout == "Bar" {
@@ -38,12 +37,6 @@ struct OverlayView: View {
         .background(background)
         .clipShape(RoundedRectangle(cornerRadius: prefs.cornerRadius))
         .shadow(color: prefs.background == "None" ? .clear : .black.opacity(0.22), radius: 18, y: 6)
-        .opacity(controller.idleDimmed ? 0.15 : prefs.textOpacity)
-        .animation(.easeInOut(duration: 0.7), value: controller.idleDimmed)
-        .animation(.easeInOut(duration: 0.2), value: prefs.textOpacity)
-        .onChange(of: model.overlayTick) { _, _ in
-            if (model.snapshot.cpu.load ?? 0) * 100 >= 10 || (model.snapshot.gpu.utilization ?? 0) >= 10 { controller.noteActivity() }
-        }
         .onAppear { controller.noteActivity() }
         .task { while !Task.isCancelled { try? await Task.sleep(for: .seconds(3)); controller.updateIdleState() } }
         .onKeyPress(.escape) { if prefs.isMoveMode { controller.endMoveMode(); return .handled }; return .ignored }
@@ -81,8 +74,8 @@ struct OverlayView: View {
             if prefs.showLabels && !prefs.compact {
                 Text(localizedLabel(metric))
                     .font(.system(size: 12 * prefs.scale, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.82))
-                    .shadow(color: .black.opacity(0.6), radius: 2, y: 1)
+                    .foregroundStyle(.white.opacity(max(0.9, prefs.textOpacity)))
+                    .shadow(color: .black.opacity(0.95), radius: 2, y: 1)
                     .lineLimit(1).minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
@@ -107,25 +100,25 @@ struct OverlayView: View {
         if prefs.background == "None" {
             Color.clear
         } else if prefs.background == "Subtle dark pill" {
-            RoundedRectangle(cornerRadius: prefs.cornerRadius).fill(Color.black.opacity(prefs.opacity))
+            RoundedRectangle(cornerRadius: prefs.cornerRadius).fill(Color.black.opacity(max(0.92, prefs.opacity)))
         } else if prefs.background == "Dark pill" || prefs.background == "Dark" {
-            RoundedRectangle(cornerRadius: prefs.cornerRadius).fill(Color.black.opacity(prefs.opacity))
+            RoundedRectangle(cornerRadius: prefs.cornerRadius).fill(Color.black.opacity(max(0.92, prefs.opacity)))
         } else {
             RoundedRectangle(cornerRadius: prefs.cornerRadius).fill(.ultraThinMaterial).overlay(Color.black.opacity(prefs.opacity * 0.22))
         }
     }
 
     @ViewBuilder private func valueView(_ metric: String, size: CGFloat) -> some View {
-        if metric == "Battery W", let watts = model.snapshot.battery.watts {
+        if metric == "Battery W", let watts = model.overlayMetricStates[metric]?.numeric {
             HStack(spacing: 2) {
                 Text(watts >= 0 ? "+" : "−").font(.system(size: max(9, size - 2) * prefs.scale, weight: .medium, design: .rounded))
-                Text(power(abs(watts))).font(.system(size: size * prefs.scale, weight: .semibold, design: .rounded))
-            }.monospacedDigit().foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.75).shadow(color: .black.opacity(0.6), radius: 2, y: 1)
+                Text(metricValue(metric)).font(.system(size: size * prefs.scale, weight: .semibold, design: .rounded))
+            }.monospacedDigit().foregroundStyle(.white.opacity(max(0.9, prefs.textOpacity))).lineLimit(1).minimumScaleFactor(0.75).shadow(color: .black.opacity(0.95), radius: 2, y: 1)
         } else {
             Text(metricValue(metric))
                 .font(.system(size: size * prefs.scale, weight: .semibold, design: .rounded))
-                .monospacedDigit().foregroundStyle(metricColor(metric)).lineLimit(1).minimumScaleFactor(0.72)
-                .shadow(color: .black.opacity(0.6), radius: 2, y: 1)
+                .monospacedDigit().foregroundStyle(metricColor(metric).opacity(max(0.9, prefs.textOpacity))).lineLimit(1).minimumScaleFactor(0.72)
+                .shadow(color: .black.opacity(0.95), radius: 2, y: 1)
         }
     }
 
@@ -140,64 +133,35 @@ struct OverlayView: View {
         return OverlayL10n.text(key, locale: locale)
     }
     private func metricValue(_ metric: String) -> String {
-        let s = model.snapshot
-        switch metric {
-        case "CPU %": return s.cpu.load.map { number($0 * 100, digits: 0, suffix: "%") } ?? "n/a"
-        case "GPU %": return s.gpu.utilization.map { number($0, digits: 0, suffix: "%") } ?? "n/a"
-        case "RAM %": return s.memory.usedPercent.map { number($0, digits: 0, suffix: "%") } ?? "n/a"
-        case "CPU power W": return power(s.power.cpu)
-        case "GPU power W": return power(s.power.gpu)
-        case "Total power W": return power(s.power.combined)
-        case "Battery %": return s.battery.percent.map { number($0 * 100, digits: 0, suffix: "%") } ?? "n/a"
-        case "Battery W": return s.battery.watts.map { power(abs($0)) } ?? "n/a"
-        case "Time remaining": return s.battery.timeRemainingMinutes.map { DisplayValue.duration(Double($0 * 60)) } ?? "n/a"
-        case "CPU temp": return temperature(s.temperatures.cpuAverage)
-        case "Hottest temp": return temperature(s.temperatures.cpuMaximum)
-        case "Network down": return model.formatRate(s.network.downBytesPerSecond)
-        case "Network up": return model.formatRate(s.network.upBytesPerSecond)
-        case "Disk read": return model.formatRate(s.diskIO.readBytesPerSecond)
-        case "Disk write": return model.formatRate(s.diskIO.writeBytesPerSecond)
-        case "Thermal state": return ["Nominal", "Fair", "Serious", "Critical"].indices.contains(s.cpu.thermalState) ? OverlayL10n.text(["Nominal", "Fair", "Serious", "Critical"][s.cpu.thermalState], locale: locale) : "n/a"
-        case "Top process": return s.processes.first.map { "\($0.name) · \(Int($0.cpuPercent))%" } ?? "n/a"
-        case "Clock time": return Date.now.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(locale))
-        default: return "n/a"
-        }
-    }
-    private func number(_ value: Double?, digits: Int, suffix: String) -> String {
-        guard let value, value.isFinite else { return "n/a" }
-        return value.formatted(.number.locale(locale).precision(.fractionLength(digits))) + suffix
-    }
-    private func power(_ watts: Double?) -> String {
-        guard let watts, watts.isFinite else { return "n/a" }
-        return abs(watts) < 1 ? number(watts * 1000, digits: 0, suffix: " mW") : number(watts, digits: 1, suffix: " W")
-    }
-    private func temperature(_ celsius: Double?) -> String {
-        guard let celsius else { return "n/a" }
-        return number(model.fahrenheit ? celsius * 9 / 5 + 32 : celsius, digits: 0, suffix: model.fahrenheit ? "°F" : "°C")
+        model.overlayMetricStates[metric]?.text ?? "n/a"
     }
     private func metricColor(_ metric: String) -> Color {
         guard prefs.colorsEnabled else { return .white }
+        let state = model.overlayMetricStates[metric]
         switch metric {
         case "CPU %":
-            let n = (model.snapshot.cpu.load ?? 0) * 100
-            return n >= 100 ? .red : n >= prefs.cpuWarning ? .orange : n >= 60 ? .yellow : .green
+            return thresholdColor(state?.numeric, red: 100, orange: prefs.cpuWarning, yellow: 60)
         case "GPU %":
-            let n = model.snapshot.gpu.utilization ?? 0
-            return n >= 100 ? .red : n >= prefs.gpuWarning ? .orange : n >= 60 ? .yellow : .green
+            return thresholdColor(state?.numeric, red: 100, orange: prefs.gpuWarning, yellow: 60)
         case "RAM %":
-            let n = model.snapshot.memory.usedPercent ?? 0
-            return n >= 100 ? .red : n >= prefs.ramWarning ? .orange : n >= 60 ? .yellow : .green
+            return thresholdColor(state?.numeric, red: 100, orange: prefs.ramWarning, yellow: 60)
         case "CPU temp", "Hottest temp":
-            let n = metric == "CPU temp" ? model.snapshot.temperatures.cpuAverage : model.snapshot.temperatures.cpuMaximum
-            guard let n else { return .white }
-            return n >= 95 ? .red : n >= 85 ? .orange : n >= prefs.temperatureWarning ? .yellow : .green
+            return thresholdColor(state?.numeric, red: 95, orange: 85, yellow: prefs.temperatureWarning)
         case "Battery %":
-            guard model.snapshot.battery.percent != nil else { return .white }
-            if model.snapshot.battery.charging == true { return .green }
-            let n = (model.snapshot.battery.percent ?? 0) * 100
-            return n < prefs.batteryRed ? .red : n < prefs.batteryOrange ? .orange : .green
+            guard let n = state?.numeric else { return .white }
+            if state?.charging == true { return Color(red: 0.35, green: 0.90, blue: 0.55) }
+            if n < prefs.batteryRed { return Color(red: 1, green: 0.30, blue: 0.30) }
+            if n < prefs.batteryOrange { return Color(red: 1, green: 0.58, blue: 0.15) }
+            return Color(red: 0.35, green: 0.90, blue: 0.55)
         default: return .white
         }
+    }
+    private func thresholdColor(_ value: Double?, red: Double, orange: Double, yellow: Double) -> Color {
+        guard let value else { return .white }
+        if value >= red { return Color(red: 1, green: 0.30, blue: 0.30) }
+        if value >= orange { return Color(red: 1, green: 0.58, blue: 0.15) }
+        if value >= yellow { return Color(red: 1, green: 0.84, blue: 0.25) }
+        return Color(red: 0.35, green: 0.90, blue: 0.55)
     }
     private func history(for metric: String) -> [TelemetryPoint]? {
         switch metric { case "CPU %": model.cpuHistory; case "GPU %": model.gpuHistory; case "RAM %": model.memoryHistory; case "Battery W": model.batteryPowerHistory; default: nil }

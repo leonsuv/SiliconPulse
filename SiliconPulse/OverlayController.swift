@@ -8,8 +8,8 @@ import Observation
     var metrics = UserDefaults.standard.stringArray(forKey: "overlay.metrics") ?? ["CPU %", "GPU %", "RAM %", "Battery %", "Battery W", "CPU temp"] { didSet { UserDefaults.standard.set(metrics, forKey: "overlay.metrics") } }
     var draggedMetric: String?
     var layout = UserDefaults.standard.string(forKey: "overlay.layout") ?? "List" { didSet { UserDefaults.standard.set(layout, forKey: "overlay.layout") } }
-    var refresh = UserDefaults.standard.double(forKey: "overlay.refresh") == 0 ? 1.0 : UserDefaults.standard.double(forKey: "overlay.refresh") { didSet { UserDefaults.standard.set(refresh, forKey: "overlay.refresh") } }
-    var opacity = UserDefaults.standard.object(forKey: "overlay.opacity") as? Double ?? 0.35 { didSet { UserDefaults.standard.set(opacity, forKey: "overlay.opacity") } }
+    var refresh = UserDefaults.standard.double(forKey: "overlay.refresh") == 0 ? 2.0 : UserDefaults.standard.double(forKey: "overlay.refresh") { didSet { UserDefaults.standard.set(refresh, forKey: "overlay.refresh") } }
+    var opacity = UserDefaults.standard.object(forKey: "overlay.opacity") as? Double ?? 0.92 { didSet { UserDefaults.standard.set(opacity, forKey: "overlay.opacity") } }
     var scale = UserDefaults.standard.object(forKey: "overlay.scale") as? Double ?? 1.0 { didSet { UserDefaults.standard.set(scale, forKey: "overlay.scale") } }
     var background = UserDefaults.standard.string(forKey: "overlay.background") ?? "Subtle dark pill" { didSet { UserDefaults.standard.set(background, forKey: "overlay.background") } }
     var textOpacity = UserDefaults.standard.object(forKey: "overlay.textOpacity") as? Double ?? 1 { didSet { UserDefaults.standard.set(textOpacity, forKey: "overlay.textOpacity") } }
@@ -21,7 +21,7 @@ import Observation
     var batteryOrange = UserDefaults.standard.object(forKey: "overlay.batteryOrange") as? Double ?? 35 { didSet { UserDefaults.standard.set(batteryOrange, forKey: "overlay.batteryOrange") } }
     var accent = UserDefaults.standard.string(forKey: "overlay.accent") ?? "System" { didSet { UserDefaults.standard.set(accent, forKey: "overlay.accent") } }
     var showLabels = UserDefaults.standard.object(forKey: "overlay.labels") as? Bool ?? true { didSet { UserDefaults.standard.set(showLabels, forKey: "overlay.labels") } }
-    var showSparklines = UserDefaults.standard.object(forKey: "overlay.sparklines") as? Bool ?? true { didSet { UserDefaults.standard.set(showSparklines, forKey: "overlay.sparklines") } }
+    var showSparklines = UserDefaults.standard.object(forKey: "overlay.sparklines") as? Bool ?? false { didSet { UserDefaults.standard.set(showSparklines, forKey: "overlay.sparklines") } }
     var compact = UserDefaults.standard.object(forKey: "overlay.compact") as? Bool ?? false { didSet { UserDefaults.standard.set(compact, forKey: "overlay.compact") } }
     var cpuWarning = UserDefaults.standard.object(forKey: "overlay.cpuWarning") as? Double ?? 85 { didSet { UserDefaults.standard.set(cpuWarning, forKey: "overlay.cpuWarning") } }
     var gpuWarning = UserDefaults.standard.object(forKey: "overlay.gpuWarning") as? Double ?? 85 { didSet { UserDefaults.standard.set(gpuWarning, forKey: "overlay.gpuWarning") } }
@@ -87,7 +87,34 @@ import Observation
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.ignoresMouseEvents = true
         panel.sharingType = preferences.screenshotMode ? .none : .readOnly
-        panel.contentView = NSHostingView(rootView: OverlayView(model: model, controller: self).environment(\.locale, model.locale))
+        if let capture = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--release-screenshot-overlay=") }) {
+            let variant = String(capture.split(separator: "=", maxSplits: 1).last ?? "list-bright")
+            preferences.layout = variant.contains("bar") ? "Bar" : "List"
+            preferences.metrics = ["CPU %", "GPU %", "RAM %", "Battery %"]
+            preferences.showLabels = true
+            preferences.showSparklines = true
+            preferences.compact = false
+            preferences.hint = false
+            preferences.background = "Subtle dark pill"
+            preferences.opacity = 0.92
+            preferences.textOpacity = 1
+            preferences.scale = 1
+            let backdrop: Color = variant.contains("bright") ? .white : .black
+            let width: CGFloat = preferences.layout == "Bar" ? 112 * CGFloat(preferences.metrics.count) + 24 : 360
+            let rowHeight: CGFloat = preferences.layout == "Bar" ? 24 : 22 * CGFloat(preferences.metrics.count)
+            let margin: CGFloat = 36
+            let content = OverlayView(model: model, controller: self)
+                .environment(\.locale, model.locale)
+                .frame(width: width, height: rowHeight)
+                .padding(margin)
+            let root = ZStack {
+                backdrop.ignoresSafeArea()
+                content
+            }.frame(width: width + margin * 2, height: rowHeight + 16 + margin * 2)
+            panel.contentView = NSHostingView(rootView: root)
+        } else {
+            panel.contentView = NSHostingView(rootView: OverlayView(model: model, controller: self).environment(\.locale, model.locale))
+        }
         placePanel()
         hotKey = OverlayHotKey(key: preferences.hotKey) { [weak self] in self?.toggle() }
     }

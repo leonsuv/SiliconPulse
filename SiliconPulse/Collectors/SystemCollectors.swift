@@ -74,7 +74,7 @@ struct NetworkCollector {
 
     mutating func collect() -> NetworkReading {
         var up: UInt64 = 0, down: UInt64 = 0
-        var localIP: String?, interfaceName: String?, vpn = false
+        var interfaceName: String?
         var head: UnsafeMutablePointer<ifaddrs>?
         if getifaddrs(&head) == 0, let first = head {
             var item: UnsafeMutablePointer<ifaddrs>? = first
@@ -84,10 +84,6 @@ struct NetworkCollector {
                     let name = String(cString: entry.ifa_name)
                     if address.pointee.sa_family == UInt8(AF_LINK), let data = entry.ifa_data?.assumingMemoryBound(to: if_data.self).pointee {
                         if name.hasPrefix("en") { up += UInt64(data.ifi_obytes); down += UInt64(data.ifi_ibytes); if interfaceName == nil { interfaceName = name } }
-                    } else if address.pointee.sa_family == UInt8(AF_INET) {
-                        let ipv4 = address.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { inet_ntoa($0.pointee.sin_addr).map { String(cString: $0) } }
-                        if name.hasPrefix("en"), localIP == nil { localIP = ipv4 }
-                        if name.hasPrefix("utun"), ipv4 != nil { vpn = true }
                     }
                 }
                 item = entry.ifa_next
@@ -103,7 +99,7 @@ struct NetworkCollector {
             }
         }
         previous = (now, up, down)
-        reading.totalUp = up; reading.totalDown = down; reading.localIPv4 = localIP; reading.interfaceName = interfaceName; reading.vpnActive = vpn
+        reading.totalUp = up; reading.totalDown = down; reading.interfaceName = interfaceName
         if let wifi = CWWiFiClient.shared().interface(), wifi.powerOn() {
             reading.rssi = wifi.rssiValue(); reading.noise = wifi.noiseMeasurement()
             if let rssi = reading.rssi, let noise = reading.noise { reading.snr = rssi - noise }

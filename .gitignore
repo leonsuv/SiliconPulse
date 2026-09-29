@@ -2,4 +2,9 @@
 .DS_Store
 xcuserdata/
 *.app
-SiliconPulse.zip
+SiliconPulse-*.zip
+release.config
+RELEASE_REPORT.md
+PUBLISH_CHECKLIST.md
+Tools/SiliconPulse.iconset/
+DerivedData/

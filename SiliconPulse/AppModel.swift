@@ -4,6 +4,12 @@ import ServiceManagement
 import AppKit
 import UserNotifications
 
+@MainActor @Observable final class OverlayMetricState {
+    var text = "n/a"
+    var numeric: Double?
+    var charging: Bool?
+}
+
 @MainActor @Observable final class AppModel {
     static let shared = AppModel()
     static let allSections = ["Battery", "Power", "GPU", "CPU", "Memory", "Disk", "Network", "Thermal", "Processes", "Sleep blockers", "System", "Bluetooth", "Fans"]
@@ -11,7 +17,7 @@ import UserNotifications
 
     var snapshot = TelemetrySnapshot()
     var cpuHistory: [TelemetryPoint] = []; var gpuHistory: [TelemetryPoint] = []
-    var overlayTick = 0
+    let overlayMetricStates = Dictionary(uniqueKeysWithValues: OverlayPreferences.allMetrics.map { ($0, OverlayMetricState()) })
     var diskReadHistory: [TelemetryPoint] = []; var diskWriteHistory: [TelemetryPoint] = []
     var powerHistory: [TelemetryPoint] = []; var batteryPowerHistory: [TelemetryPoint] = []
     var memoryHistory: [TelemetryPoint] = []; var networkDownHistory: [TelemetryPoint] = []; var networkUpHistory: [TelemetryPoint] = []
@@ -115,13 +121,13 @@ import UserNotifications
         start(open: reopen)
     }
     private func sampleOverlay(metrics: [String]) {
-        let now = Date(); chartIndex += 1; overlayTick += 1
+        let now = Date(); chartIndex += 1
         let selected = Set(metrics)
         if !selected.isDisjoint(with: ["Battery %", "Battery W", "Time remaining"]) {
             let started = ProcessInfo.processInfo.systemUptime
             snapshot.battery = BatteryCollector().collect()
             traceOverlaySample("battery", started)
-            append(TelemetryPoint(id: chartIndex, value: snapshot.battery.watts), to: &batteryPowerHistory)
+            if OverlayPreferences.shared.showSparklines { append(TelemetryPoint(id: chartIndex, value: snapshot.battery.watts), to: &batteryPowerHistory) }
         }
         if selected.contains("Thermal state") {
             snapshot.cpu.thermalState = ProcessInfo.processInfo.thermalState.rawValue
@@ -130,40 +136,90 @@ import UserNotifications
             let started = ProcessInfo.processInfo.systemUptime
             snapshot.cpu = CPUCollector().collect(previous: &cpuPrevious, previousTotal: &cpuTotalPrevious)
             traceOverlaySample("cpu", started)
-            append(TelemetryPoint(id: chartIndex, value: snapshot.cpu.load.map { $0 * 100 }), to: &cpuHistory)
+            if OverlayPreferences.shared.showSparklines { append(TelemetryPoint(id: chartIndex, value: snapshot.cpu.load.map { $0 * 100 }), to: &cpuHistory) }
         }
         if selected.contains("GPU %") || selected.contains("GPU power W") || selected.contains("Total power W") {
             let started = ProcessInfo.processInfo.systemUptime
             snapshot.gpu = gpuCollector.collect()
             traceOverlaySample("gpu", started)
-            append(TelemetryPoint(id: chartIndex, value: snapshot.gpu.utilization), to: &gpuHistory)
+            if OverlayPreferences.shared.showSparklines { append(TelemetryPoint(id: chartIndex, value: snapshot.gpu.utilization), to: &gpuHistory) }
         }
         if !selected.isDisjoint(with: ["CPU power W", "GPU power W", "Total power W"]) { snapshot.power = powerCollector.collect() }
         if selected.contains("RAM %") {
             let started = ProcessInfo.processInfo.systemUptime
             snapshot.memory = memoryCollector.collect()
             traceOverlaySample("memory", started); snapshot.memory.pressure = memoryPressureMonitor.state
-            append(TelemetryPoint(id: chartIndex, value: snapshot.memory.usedPercent), to: &memoryHistory)
+            if OverlayPreferences.shared.showSparklines { append(TelemetryPoint(id: chartIndex, value: snapshot.memory.usedPercent), to: &memoryHistory) }
         }
         if selected.contains("Network down") || selected.contains("Network up") { snapshot.network = networkCollector.collect() }
         if selected.contains("Disk read") || selected.contains("Disk write") {
             snapshot.diskIO = diskIOCollector.collect()
-            append(TelemetryPoint(id: chartIndex, value: snapshot.diskIO.readBytesPerSecond), to: &diskReadHistory)
-            append(TelemetryPoint(id: chartIndex, value: snapshot.diskIO.writeBytesPerSecond), to: &diskWriteHistory)
+            if OverlayPreferences.shared.showSparklines {
+                append(TelemetryPoint(id: chartIndex, value: snapshot.diskIO.readBytesPerSecond), to: &diskReadHistory)
+                append(TelemetryPoint(id: chartIndex, value: snapshot.diskIO.writeBytesPerSecond), to: &diskWriteHistory)
+            }
         }
         if (selected.contains("CPU temp") || selected.contains("Hottest temp")), due("OverlayTemperature", every: 3, now: now) {
             let started = ProcessInfo.processInfo.systemUptime
             let sensors = hidSensors.collect()
             traceOverlaySample("temperature", started); let cpuTemps = sensors.filter { $0.group == "CPU/SoC" }.map(\.celsius)
             snapshot.temperatures = TemperatureReading(sensors: sensors, cpuAverage: cpuTemps.isEmpty ? nil : cpuTemps.reduce(0, +) / Double(cpuTemps.count), cpuMaximum: cpuTemps.max())
-            append(TelemetryPoint(id: chartIndex, value: snapshot.temperatures.cpuMaximum), to: &temperatureHistory)
+            if OverlayPreferences.shared.showSparklines { append(TelemetryPoint(id: chartIndex, value: snapshot.temperatures.cpuMaximum), to: &temperatureHistory) }
         }
         if selected.contains("Top process"), due("OverlayProcesses", every: 3, now: now) {
             let started = ProcessInfo.processInfo.systemUptime
             snapshot.processes = processCollector.collect(sortByMemory: false)
             traceOverlaySample("process", started)
         }
-        onMenuLabelUpdate?()
+        publishOverlayMetricValues(selected, now: now)
+        if (snapshot.cpu.load ?? 0) >= 0.1 || (snapshot.gpu.utilization ?? 0) >= 10 { OverlayController.active?.noteActivity() }
+    }
+
+    private func publishOverlayMetricValues(_ metrics: Set<String>, now: Date) {
+        let s = snapshot
+        for metric in metrics {
+            guard let state = overlayMetricStates[metric] else { continue }
+            let text: String
+            let numeric: Double?
+            switch metric {
+            case "CPU %": numeric = s.cpu.load.map { $0 * 100 }; text = numeric.map { DisplayValue.decimal($0, digits: 0, suffix: "%") } ?? "n/a"
+            case "GPU %": numeric = s.gpu.utilization; text = numeric.map { DisplayValue.decimal($0, digits: 0, suffix: "%") } ?? "n/a"
+            case "RAM %": numeric = s.memory.usedPercent; text = numeric.map { DisplayValue.decimal($0, digits: 0, suffix: "%") } ?? "n/a"
+            case "CPU power W": numeric = s.power.cpu; text = overlayPower(s.power.cpu)
+            case "GPU power W": numeric = s.power.gpu; text = overlayPower(s.power.gpu)
+            case "Total power W": numeric = s.power.combined; text = overlayPower(s.power.combined)
+            case "Battery %": numeric = s.battery.percent.map { $0 * 100 }; text = numeric.map { DisplayValue.decimal($0, digits: 0, suffix: "%") } ?? "n/a"
+            case "Battery W": numeric = s.battery.watts; text = s.battery.watts.map { overlayPower(abs($0)) } ?? "n/a"
+            case "Time remaining": numeric = nil; text = s.battery.timeRemainingMinutes.map { DisplayValue.duration(Double($0 * 60)) } ?? "n/a"
+            case "CPU temp": numeric = s.temperatures.cpuAverage; text = overlayTemperature(s.temperatures.cpuAverage)
+            case "Hottest temp": numeric = s.temperatures.cpuMaximum; text = overlayTemperature(s.temperatures.cpuMaximum)
+            case "Network down": numeric = s.network.downBytesPerSecond; text = formatRate(numeric)
+            case "Network up": numeric = s.network.upBytesPerSecond; text = formatRate(numeric)
+            case "Disk read": numeric = s.diskIO.readBytesPerSecond; text = formatRate(numeric)
+            case "Disk write": numeric = s.diskIO.writeBytesPerSecond; text = formatRate(numeric)
+            case "Thermal state":
+                numeric = nil
+                let states = ["Nominal", "Fair", "Serious", "Critical"]
+                text = states.indices.contains(s.cpu.thermalState) ? OverlayL10n.text(states[s.cpu.thermalState], locale: locale) : "n/a"
+            case "Top process": numeric = nil; text = s.processes.first.map { "\($0.name) · \(Int($0.cpuPercent))%" } ?? "n/a"
+            case "Clock time": numeric = nil; text = now.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(locale))
+            default: continue
+            }
+            if state.text != text { state.text = text }
+            if state.numeric != numeric { state.numeric = numeric }
+            if state.charging != s.battery.charging { state.charging = s.battery.charging }
+        }
+    }
+
+    private func overlayPower(_ watts: Double?) -> String {
+        guard let watts, watts.isFinite else { return "n/a" }
+        if abs(watts) < 1 { return DisplayValue.decimal(watts * 1000, digits: 0, suffix: " mW") }
+        return DisplayValue.decimal(watts, digits: 1, suffix: " W")
+    }
+
+    private func overlayTemperature(_ celsius: Double?) -> String {
+        guard let celsius else { return "n/a" }
+        return DisplayValue.decimal(fahrenheit ? celsius * 9 / 5 + 32 : celsius, digits: 0, suffix: fahrenheit ? "°F" : "°C")
     }
     func setProcessMemorySort(_ memory: Bool) { processMemorySort = memory; sampleDates.removeValue(forKey: "Processes") }
     func setVisibleSection(_ section: String, visible: Bool) {
@@ -279,13 +335,14 @@ import UserNotifications
             append(TelemetryPoint(id: chartIndex, value: snapshot.temperatures.cpuMaximum), to: &temperatureHistory)
             thermalTimeline.append(snapshot.cpu.thermalState); if thermalTimeline.count > 150 { thermalTimeline.removeFirst(thermalTimeline.count - 300) }
         }
-        if visibleSections.contains("Processes"), expanded.contains("Processes"), due("Processes", every: 3, now: now) { snapshot.processes = processCollector.collect(sortByMemory: processMemorySort) }
-        if visibleSections.contains("Sleep blockers"), expanded.contains("Sleep blockers"), due("Sleep blockers", every: 5, now: now) { snapshot.sleepBlockers = SleepAssertionCollector().collect() }
-        if visibleSections.contains("Bluetooth") {
+        let screenshotMode = ProcessInfo.processInfo.arguments.contains("--release-screenshot")
+        if !screenshotMode, visibleSections.contains("Processes"), expanded.contains("Processes"), due("Processes", every: 3, now: now) { snapshot.processes = processCollector.collect(sortByMemory: processMemorySort) }
+        if !screenshotMode, visibleSections.contains("Sleep blockers"), expanded.contains("Sleep blockers"), due("Sleep blockers", every: 5, now: now) { snapshot.sleepBlockers = SleepAssertionCollector().collect() }
+        if !screenshotMode, visibleSections.contains("Bluetooth") {
             if !bluetoothDiscoveryDone { snapshot.bluetooth = bluetoothCollector.collect(); bluetoothDiscoveryDone = true; sampleDates["Bluetooth"] = now }
             else if !snapshot.bluetooth.isEmpty && expanded.contains("Bluetooth"), due("Bluetooth", every: 30, now: now) { snapshot.bluetooth = bluetoothCollector.collect() }
         }
-        if visibleSections.contains("Fans"), enableSMCFans {
+        if !screenshotMode, visibleSections.contains("Fans"), enableSMCFans {
             if !fansDiscoveryDone { snapshot.fans = fanCollector.collect(); fansDiscoveryDone = true; sampleDates["Fans"] = now }
             else if !snapshot.fans.isEmpty && expanded.contains("Fans"), due("Fans", every: 30, now: now) { snapshot.fans = fanCollector.collect() }
         }
@@ -342,6 +399,19 @@ import UserNotifications
         lines += ["Battery: \(value(for: "Battery %"))", "Battery power: \(value(for: "Battery W"))", "CPU: \(value(for: "CPU %"))", "GPU: \(value(for: "GPU %"))", "Power: \(value(for: "Power W"))", "Memory: \(formatBytes(snapshot.memory.used))", "Disk I/O: \(value(for: "Disk I/O"))", "Network down/up: \(value(for: "Net down")) / \(value(for: "Net up"))", "Temperature: \(value(for: "Temperature"))", "Thermal state: \(snapshot.cpu.thermalState)"]
         if UserDefaults.standard.bool(forKey: "copyProcessNames") { lines += snapshot.processes.map { "Process \($0.name): \(DisplayValue.decimal($0.cpuPercent, digits: 0, suffix: "%"))" } }
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+    }
+    func diagnosticDump() -> String {
+        [
+            "SiliconPulse \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")",
+            "macOS: \(snapshot.system.macOS)",
+            "Chip: \(snapshot.system.chip ?? "n/a")",
+            "Model: \(snapshot.system.model ?? "n/a")",
+            "CPU cores: \(snapshot.system.cpuCores) (E: \(snapshot.system.eCores.map(String.init) ?? "n/a"), P: \(snapshot.system.pCores.map(String.init) ?? "n/a"))",
+            "Battery: \(value(for: "Battery %")); health: \(snapshot.battery.health.map { DisplayValue.decimal($0 * 100, digits: 0, suffix: "%") } ?? "n/a")",
+            "CPU load: \(value(for: "CPU %")); GPU load: \(value(for: "GPU %"))",
+            "Power: \(value(for: "Power W")); memory: \(formatBytes(snapshot.memory.used))",
+            "Thermal state: \(["Nominal", "Fair", "Serious", "Critical"].indices.contains(snapshot.cpu.thermalState) ? ["Nominal", "Fair", "Serious", "Critical"][snapshot.cpu.thermalState] : "n/a")"
+        ].joined(separator: "\n")
     }
     private func evaluateAlerts(now: Date) {
         guard alertsEnabled else { highCPUStart = nil; return }

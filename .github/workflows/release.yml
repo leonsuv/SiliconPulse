@@ -1,4 +1,4 @@
-name: Build and release
+name: Release
 on:
   push:
     tags: ['v*']
@@ -9,11 +9,20 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Set release version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - name: Build app
         run: ./build.sh
-      - name: Package app
-        run: ditto -c -k --sequesterRsrc --keepParent SiliconPulse.app SiliconPulse.zip
+      - name: Package and checksum
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent SiliconPulse.app "SiliconPulse-${VERSION}.zip"
+          shasum -a 256 "SiliconPulse-${VERSION}.zip" > SHA256SUMS.txt
+          awk '/^## \[/ { if (found) exit; found=1 } found { print }' CHANGELOG.md > release-notes.md
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: SiliconPulse.zip
+          files: |
+            SiliconPulse-${{ env.VERSION }}.zip
+            SHA256SUMS.txt
+          body_path: release-notes.md
+          make_latest: true

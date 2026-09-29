@@ -3,13 +3,24 @@ import ServiceManagement
 import UserNotifications
 import AppKit
 import UniformTypeIdentifiers
+import Combine
+
+final class SettingsTabSelection: ObservableObject {
+    @Published var index: Int
+    init(_ index: Int) { self.index = index }
+}
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @StateObject private var tabSelection: SettingsTabSelection
+
+    init(tab: Int = 0, tabSelection: SettingsTabSelection? = nil) {
+        _tabSelection = StateObject(wrappedValue: tabSelection ?? SettingsTabSelection(tab))
+    }
 
     var body: some View {
         @Bindable var settings = model
-        TabView {
+        TabView(selection: $tabSelection.index) {
             Form {
                 Section("Startup") {
                     Toggle("Launch at login", isOn: Binding(get: { SMAppService.mainApp.status == .enabled }, set: { _ in model.toggleLogin() }))
@@ -33,7 +44,7 @@ struct SettingsView: View {
                     }
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
                 }
-            }.formStyle(.grouped).tabItem { Label("General", systemImage: "slider.horizontal.3") }
+            }.formStyle(.grouped).tabItem { Label("General", systemImage: "slider.horizontal.3") }.tag(0)
 
             Form {
                 Section("Visible menu bar metrics") {
@@ -71,7 +82,7 @@ struct SettingsView: View {
                     Text(model.menuMetrics.map { "\(model.menuSymbol(for: $0))  \(model.value(for: $0))" }.joined(separator: "   ·   "))
                         .font(.system(.body, design: .monospaced)).lineLimit(2)
                 }
-            }.formStyle(.grouped).tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }
+            }.formStyle(.grouped).tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }.tag(1)
 
             NavigationStack {
                 List {
@@ -87,7 +98,7 @@ struct SettingsView: View {
                         }
                     }.onMove(perform: model.moveSection)
                 }.navigationTitle("Sections")
-            }.tabItem { Label("Sections", systemImage: "rectangle.3.group") }
+            }.tabItem { Label("Sections", systemImage: "rectangle.3.group") }.tag(2)
 
             Form {
                 Section("Temperature and capacity") {
@@ -96,7 +107,7 @@ struct SettingsView: View {
                     Toggle("Network rates in bits", isOn: $settings.networkBits).onChange(of: model.networkBits) { _, value in UserDefaults.standard.set(value, forKey: "networkBits") }
                     Toggle("Use 24-hour time", isOn: $settings.use24HourTime)
                 }
-            }.formStyle(.grouped).tabItem { Label("Units", systemImage: "ruler") }
+            }.formStyle(.grouped).tabItem { Label("Units", systemImage: "ruler") }.tag(3)
 
             Form {
                 Section {
@@ -133,7 +144,7 @@ struct SettingsView: View {
                         }
                     }
                 }
-            }.formStyle(.grouped).tabItem { Label("Notifications", systemImage: "bell.badge") }
+            }.formStyle(.grouped).tabItem { Label("Notifications", systemImage: "bell.badge") }.tag(4)
 
             Form {
                 Section("Optional network request") {
@@ -163,7 +174,7 @@ struct SettingsView: View {
                     Link("GitHub project", destination: URL(string: "https://github.com")!)
                     Text("MIT License · Private telemetry interfaces: IOReport and AppleSMC sensor access.").font(.caption).foregroundStyle(.secondary)
                 }
-            }.formStyle(.grouped).tabItem { Label("Advanced", systemImage: "gearshape.2") }
+            }.formStyle(.grouped).tabItem { Label("Advanced", systemImage: "gearshape.2") }.tag(5)
 
             overlaySettings
         }.padding(8).frame(minWidth: 650, minHeight: 520).navigationTitle("SiliconPulse Settings")
@@ -209,8 +220,8 @@ struct SettingsView: View {
             }
             Section("Appearance") {
                 Picker("Background", selection: $preferences.background) { Text("None").tag("None"); Text("Subtle dark pill").tag("Subtle dark pill"); Text("Blurred material").tag("Material") }
-                LabeledContent("Background opacity") { Slider(value: $preferences.opacity, in: 0.1...1).frame(width: 180) }
-                LabeledContent("Text opacity") { Slider(value: $preferences.textOpacity, in: 0.3...1).frame(width: 180) }
+                LabeledContent("Background opacity") { Slider(value: $preferences.opacity, in: 0.92...1).frame(width: 180) }
+                LabeledContent("Text opacity") { Slider(value: $preferences.textOpacity, in: 0.9...1).frame(width: 180) }
                 LabeledContent("Corner radius") { Slider(value: $preferences.cornerRadius, in: 0...28).frame(width: 180) }
                 LabeledContent("Text scale") { Slider(value: $preferences.scale, in: 0.8...1.6).frame(width: 180) }.onChange(of: preferences.scale) { _, _ in controller?.preferencesChanged() }
                 LabeledContent("Sample interval") { Picker("Sample interval", selection: $preferences.refresh) { Text("0.5 s").tag(0.5); Text("1 s").tag(1.0); Text("2 s").tag(2.0); Text("5 s").tag(5.0) }.labelsHidden() }
@@ -238,7 +249,7 @@ struct SettingsView: View {
                     .padding(12).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                 Text("Metrics without available hardware support display n/a.").font(.caption).foregroundStyle(.secondary)
             }
-        }.formStyle(.grouped).tabItem { Label("Overlay", systemImage: "rectangle.inset.filled") }
+        }.formStyle(.grouped).tabItem { Label("Overlay", systemImage: "rectangle.inset.filled") }.tag(6)
     }
 
     private func overlaySettingMetricLabel(_ metric: String) -> String {

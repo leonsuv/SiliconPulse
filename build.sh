@@ -1,11 +1,15 @@
 #!/bin/bash
 set -euo pipefail
-cd "$(dirname "$0")"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+if [[ -f release.config ]]; then source release.config; fi
+BUNDLE_ID="${BUNDLE_ID:-io.github.leonsuv.SiliconPulse}"
+VERSION="${VERSION:-1.0.0}"
 swift build -c release
-APP="$(pwd)/SiliconPulse.app"
+APP="$ROOT/SiliconPulse.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/SiliconPulse "$APP/Contents/MacOS/SiliconPulse"
-if [ -d .build/release/SiliconPulse_SiliconPulse.bundle ]; then cp -R .build/release/SiliconPulse_SiliconPulse.bundle "$APP/Contents/Resources/"; fi
+if [[ -d .build/release/SiliconPulse_SiliconPulse.bundle ]]; then cp -R .build/release/SiliconPulse_SiliconPulse.bundle "$APP/Contents/Resources/"; fi
 python3 - "$APP/Contents/Resources" <<'PYLOC'
 import json, pathlib, sys
 root = pathlib.Path.cwd()
@@ -20,14 +24,23 @@ for language in ("en", "de"):
         if language != catalog.get("sourceLanguage", "en"):
             localized = entry.get("localizations", {}).get(language, {})
             value = localized.get("stringUnit", {}).get("value", key)
-        escaped_key = json.dumps(key, ensure_ascii=False)
-        escaped_value = json.dumps(value, ensure_ascii=False)
-        lines.append(f"{escaped_key} = {escaped_value};")
+        lines.append(f"{json.dumps(key, ensure_ascii=False)} = {json.dumps(value, ensure_ascii=False)};")
     (directory / "Localizable.strings").write_text("\n".join(lines) + "\n")
 PYLOC
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict><key>CFBundleExecutable</key><string>SiliconPulse</string><key>CFBundleIdentifier</key><string>com.example.SiliconPulse</string><key>CFBundleName</key><string>SiliconPulse</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleVersion</key><string>1</string><key>CFBundleShortVersionString</key><string>1.0</string><key>LSUIElement</key><true/><key>LSMinimumSystemVersion</key><string>14.0</string></dict></plist>
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>SiliconPulse</string>
+<key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
+<key>CFBundleName</key><string>SiliconPulse</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleVersion</key><string>${VERSION}</string>
+<key>CFBundleShortVersionString</key><string>${VERSION}</string>
+<key>CFBundleIconFile</key><string>AppIcon.icns</string>
+<key>LSUIElement</key><true/>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+</dict></plist>
 PLIST
+cp Tools/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --deep --sign - "$APP"

@@ -6,10 +6,16 @@ import UniformTypeIdentifiers
 struct DashboardView: View {
     @Environment(AppModel.self) private var model
     let panelController: PanelController
-    let onSettings: () -> Void
 
     private var cards: [String] {
+        let screenshotRun = ProcessInfo.processInfo.arguments.contains("--release-screenshot")
+        let selectedCard = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--release-screenshot-card=") })?.split(separator: "=", maxSplits: 1).last.map(String.init)
+        if screenshotRun {
+            if let selectedCard { return AppModel.allSections.contains(selectedCard) ? [selectedCard] : [] }
+            return AppModel.allSections
+        }
         let ordered = model.sectionOrder.filter { section in
+            (selectedCard == nil || selectedCard == section) &&
             (panelController.editMode || section != "Bluetooth" || !model.snapshot.bluetooth.isEmpty) &&
             (panelController.editMode || section != "Fans" || !model.snapshot.fans.isEmpty)
         }
@@ -37,8 +43,8 @@ struct DashboardView: View {
                     Image(systemName: panelController.editMode ? "checkmark" : "pencil").foregroundStyle(.primary)
                 }.buttonStyle(.plain).help(panelController.editMode ? Text("Done editing") : Text("Edit cards"))
                     .accessibilityLabel(panelController.editMode ? "Done editing" : "Edit cards")
-                Button(action: onSettings) { Image(systemName: "gearshape").foregroundStyle(.primary) }
-                    .buttonStyle(.plain).help(Text("Settings"))
+                Button { SettingsWindowController.shared.show(model: model) } label: { Image(systemName: "gearshape").foregroundStyle(.primary) }
+                    .buttonStyle(.plain).help(Text("Settings")).accessibilityLabel(Text("Settings"))
                 if panelController.isPinned {
                     Button { panelController.close() } label: { Image(systemName: "xmark").foregroundStyle(.secondary) }
                         .buttonStyle(.plain).help(Text("Close panel")).accessibilityLabel("Close panel")
@@ -326,7 +332,7 @@ private struct CardView: View {
 
     private var network: some View {
         VStack(spacing: 7) {
-            rows([("Down", rate(model.snapshot.network.downBytesPerSecond)), ("Up", rate(model.snapshot.network.upBytesPerSecond)), ("Interface", model.snapshot.network.interfaceName ?? "n/a"), ("Local IPv4", model.snapshot.network.localIPv4 ?? "n/a"), ("Wi-Fi RSSI", model.snapshot.network.rssi.map { "\($0) dBm" } ?? "n/a"), ("Noise / SNR", "\(model.snapshot.network.noise.map(String.init) ?? "n/a") / \(model.snapshot.network.snr.map(String.init) ?? "n/a") dBm"), ("Channel", model.snapshot.network.channel ?? "n/a"), ("Link rate", DisplayValue.decimal(model.snapshot.network.linkMbps, suffix: " Mbps")), ("PHY mode", model.snapshot.network.phyMode ?? "n/a"), ("Security", model.snapshot.network.security ?? "n/a"), ("TX power", model.snapshot.network.transmitPower.map { "\($0) dBm" } ?? "n/a"), ("Totals since boot", "\(model.formatBytes(model.snapshot.network.totalDown)) / \(model.formatBytes(model.snapshot.network.totalUp))"), ("VPN", model.snapshot.network.vpnActive.map { $0 ? "Active" : "Off" } ?? "n/a"), ("Latency", model.snapshot.network.latencyMs.map { DisplayValue.decimal($0, digits: 0, suffix: " ms") } ?? "n/a")])
+            rows([("Down", rate(model.snapshot.network.downBytesPerSecond)), ("Up", rate(model.snapshot.network.upBytesPerSecond)), ("Wi-Fi RSSI", model.snapshot.network.rssi.map { "\($0) dBm" } ?? "n/a"), ("Channel", model.snapshot.network.channel ?? "n/a"), ("Link rate", DisplayValue.decimal(model.snapshot.network.linkMbps, digits: 0, suffix: " Mbps")), ("Latency", model.snapshot.network.latencyMs.map { DisplayValue.decimal($0, digits: 0, suffix: " ms") } ?? "n/a")])
             Chart {
                 ForEach(model.networkDownHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Direction", "Down")) } }
                 ForEach(model.networkUpHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Direction", "Up")) } }
