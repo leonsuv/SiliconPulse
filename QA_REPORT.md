@@ -61,3 +61,9 @@ Process CPU time was measured with `getrusage` over ten-second wall-clock interv
 DRAM energy on this macOS version, NPU/media active residency where no channel is exposed, and restricted per-process GPU/NPU/private-memory/network counters show `n/a`. CPU/GPU frequency tables are validated against the exposed residency states; unsupported chips do not get guessed frequency values. Some system processes are inaccessible without additional privileges and cannot provide all process details.
 
 The internet benchmark and combined score were not executed in QA. Administrator-password flows, changes to real system services, full-volume scans, macOS 14 compatibility at runtime, and other Apple Silicon chip families were not exercised. Destructive QA actions were confined to generated fixtures. No additional unit tests were added.
+
+## Smooth telemetry charts (2026-10-09)
+
+Monitor, replay, panel and overlay line charts now use monotone interpolation, which rounds the transitions without the overshoot of an unrestricted spline. A shared chart modifier gives each chart a fixed horizontal history span and animates new samples and domain movement over 850 ms. This removes the old explicit animation suppression and initial per-sample horizontal rescaling. Animations are scoped to charts, respect Reduce Motion, and introduce no additional sampling or display timers. Overlay sparklines remain conditional on the existing setting.
+
+`./build.sh` succeeded and the app was ad-hoc signed. This pass did not repeat the full management-action QA or remeasure CPU; the earlier CPU figures do not characterize animated charts. Perceptual smoothness across displays is not established by the build check.

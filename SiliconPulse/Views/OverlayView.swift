@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 import AppKit
 
 struct OverlayView: View {
@@ -186,21 +187,18 @@ private struct OverlaySparkline: View {
     let points: [TelemetryPoint]
     let color: Color
     var body: some View {
-        Canvas { context, size in
-            let values = points.suffix(30).compactMap(\.value)
-            guard values.count > 1 else { return }
-            let low = values.min() ?? 0
-            let high = values.max() ?? low
-            let span = max(0.0001, high - low)
-            var path = Path()
-            for index in values.indices {
-                let x = size.width * CGFloat(index) / CGFloat(values.count - 1)
-                let y = size.height - (CGFloat(values[index] - low) / CGFloat(span)) * (size.height - 2) - 1
-                let point = CGPoint(x: x, y: y)
-                if index == values.startIndex { path.move(to: point) } else { path.addLine(to: point) }
+        Chart(points.suffix(30)) { point in
+            if let value = point.value {
+                LineMark(x: .value("Time", point.id), y: .value("Value", value))
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(color)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
             }
-            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
         }
+        .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
+        .chartYScale(domain: .automatic(includesZero: false))
+        .smoothTelemetryChart(latest: points.last?.id ?? 0, window: 30)
+        .clipped()
         .accessibilityHidden(true)
     }
 }

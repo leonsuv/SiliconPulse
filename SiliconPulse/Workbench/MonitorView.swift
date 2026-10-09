@@ -147,7 +147,7 @@ struct MetricHistory: View {
         Chart {
             ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
                 ForEach(monitor.history[key] ?? []) { point in
-                    if let value = point.value { LineMark(x: .value("Time", point.id), y: .value("Value", value)).foregroundStyle(by: .value("Metric", key)).lineStyle(StrokeStyle(lineWidth: 1.5)) }
+                    if let value = point.value { LineMark(x: .value("Time", point.id), y: .value("Value", value)).interpolationMethod(.monotone).foregroundStyle(by: .value("Metric", key)).lineStyle(StrokeStyle(lineWidth: 1.5)) }
                 }
             }
         }
@@ -161,7 +161,7 @@ struct MetricHistory: View {
         plot
         .chartXAxis(axes ? .automatic : .hidden).chartYAxis(axes ? .automatic : .hidden)
         .chartLegend { if keys.count > 1 && axes { HStack(spacing: 12) { ForEach(Array(keys.enumerated()), id: \.offset) { index, key in HStack(spacing: 4) { Circle().fill(colors[min(index, colors.count - 1)]).frame(width: 7, height: 7); Text(LocalizedStringKey(key)) }.font(.caption) } } } }
-        .transaction { $0.animation = nil }
+        .smoothTelemetryChart(latest: keys.compactMap { monitor.history[$0]?.last?.id }.max() ?? 0, window: 300)
         .accessibilityLabel(Text(keys.joined(separator: ", ")))
     }
 }
@@ -401,7 +401,7 @@ private struct FlightInspectorView: View {
                         MonitorGroup(key) {
                             if flight.isReplaying {
                                 Text(replayValue(key, flight.current?.values[key])).font(.title2).monospacedDigit()
-                                Chart(flight.points(key)) { p in if let value = p.value { LineMark(x: .value("Time", p.id), y: .value("Value", value)).foregroundStyle(.tint) } }.chartXAxis(.hidden).frame(height: 125).transaction { $0.animation = nil }
+                                Chart(flight.points(key)) { p in if let value = p.value { LineMark(x: .value("Time", p.id), y: .value("Value", value)).interpolationMethod(.monotone).foregroundStyle(.tint) } }.chartXAxis(.hidden).frame(height: 125).smoothTelemetryChart(latest: flight.points(key).last?.id ?? 0, window: 60)
                             } else { MetricHistory(keys: [key], colors: [.accentColor]).frame(height: 150) }
                         }
                     }

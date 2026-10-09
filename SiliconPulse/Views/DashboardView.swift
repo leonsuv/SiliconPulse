@@ -197,11 +197,11 @@ private struct GlanceTile: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Chart(points) { point in
                     if let sample = point.value {
-                        LineMark(x: .value("Time", point.id), y: .value(title, sample))
+                        LineMark(x: .value("Time", point.id), y: .value(title, sample)).interpolationMethod(.monotone)
                             .foregroundStyle(color).lineStyle(StrokeStyle(lineWidth: 1.5))
                     }
                 }.chartXAxis(.hidden).chartYAxis(.hidden)
-                    .frame(width: 46, height: 20).clipped().transaction { $0.animation = nil }
+                    .frame(width: 46, height: 20).clipped().smoothTelemetryChart(latest: points.last?.id ?? 0, window: 60)
                     .accessibilityLabel(Text("\(title) history"))
             }
         }
@@ -348,8 +348,8 @@ private struct CardView: View {
                 }
             }
             rows([("Cycles / design 1000", "\(DisplayValue.number(b.cycles)) / 1000"), ("Capacity", "\(DisplayValue.number(b.nominalCapacity)) / \(DisplayValue.number(b.designCapacity)) mAh"), ("Remaining capacity", "\(DisplayValue.number(b.remainingCapacity)) mAh"), ("Last full charge", "\(DisplayValue.number(b.fullChargeCapacity)) mAh"), ("Capacity loss", b.health.map { DisplayValue.decimal((1 - $0) * 100, suffix: "%") } ?? "n/a"), ("Voltage / current", "\(DisplayValue.decimal(b.voltage, suffix: " V")) / \(DisplayValue.decimal(b.amperage, suffix: " A"))"), ("Live power", DisplayValue.decimal(b.watts, suffix: " W")), ("Temperature", temperature(b.temperatureC)), ("Adapter", b.externalConnected == true ? DisplayValue.decimal(b.adapterWatts, suffix: " W") : "-")])
-            Chart(model.batteryPowerHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("Watts", value)).foregroundStyle(.orange) } }
-                .chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 32).transaction { $0.animation = nil }.accessibilityLabel("Battery power history")
+            Chart(model.batteryPowerHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("Watts", value)).interpolationMethod(.monotone).foregroundStyle(.orange) } }
+                .chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 32).smoothTelemetryChart(latest: model.batteryPowerHistory.last?.id ?? 0, window: model.historyMinutes * 60).accessibilityLabel("Battery power history")
         }
     }
     private var batteryStatus: String {
@@ -363,8 +363,8 @@ private struct CardView: View {
     private var power: some View {
         VStack(spacing: 6) {
             rows([("CPU", powerValue(model.snapshot.power.cpu)), ("GPU", powerValue(model.snapshot.power.gpu)), ("ANE", powerValue(model.snapshot.power.ane)), ("DRAM", powerValue(model.snapshot.power.dram)), ("Combined", powerValue(model.snapshot.power.combined))])
-            Chart(model.powerHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("Power", value)).foregroundStyle(.yellow) } }
-                .chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).transaction { $0.animation = nil }.accessibilityLabel("System power history")
+            Chart(model.powerHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("Power", value)).interpolationMethod(.monotone).foregroundStyle(.yellow) } }
+                .chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).smoothTelemetryChart(latest: model.powerHistory.last?.id ?? 0, window: model.historyMinutes * 60).accessibilityLabel("System power history")
         }
     }
     private var gpu: some View {
@@ -378,8 +378,8 @@ private struct CardView: View {
                 Spacer(minLength: 0)
             }
             rows([("Renderer", DisplayValue.decimal(g.rendererUtilization, digits: 0, suffix: "%")), ("Tiler", DisplayValue.decimal(g.tilerUtilization, digits: 0, suffix: "%")), ("GPU memory in use", model.formatBytes(g.memoryInUse)), ("GPU cores", DisplayValue.number(g.coreCount)), ("GPU power", powerValue(model.snapshot.power.gpu))])
-            Chart(model.gpuHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("GPU", value)).foregroundStyle(.tint) } }
-                .chartYScale(domain: 0...100).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).transaction { $0.animation = nil }.accessibilityLabel("GPU utilization history")
+            Chart(model.gpuHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("GPU", value)).interpolationMethod(.monotone).foregroundStyle(.tint) } }
+                .chartYScale(domain: 0...100).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).smoothTelemetryChart(latest: model.gpuHistory.last?.id ?? 0, window: model.historyMinutes * 60).accessibilityLabel("GPU utilization history")
         }
     }
     private var cpu: some View {
@@ -387,8 +387,8 @@ private struct CardView: View {
             HStack { Text("Total").foregroundStyle(.secondary); Spacer(); Text(DisplayValue.decimal(model.snapshot.cpu.load.map { $0 * 100 }, suffix: "%")).font(.system(size: 27, weight: .semibold)).monospacedDigit() }
             rows([("User", DisplayValue.decimal(model.snapshot.cpu.user, digits: 0, suffix: "%")), ("System", DisplayValue.decimal(model.snapshot.cpu.system, digits: 0, suffix: "%")), ("Idle", DisplayValue.decimal(model.snapshot.cpu.idle, digits: 0, suffix: "%")), ("Load average 1 / 5 / 15", model.snapshot.cpu.loadAverage.map { DisplayValue.decimal($0, digits: 2) }.joined(separator: " / ").isEmpty ? "n/a" : model.snapshot.cpu.loadAverage.map { DisplayValue.decimal($0, digits: 2) }.joined(separator: " / ")), ("Processes", DisplayValue.number(model.snapshot.cpu.processCount))])
             HStack(spacing: 8) { clusterBar("E", value: model.snapshot.cpu.eAverage, tint: .teal); clusterBar("P", value: model.snapshot.cpu.pAverage, tint: .orange) }
-            Chart(model.cpuHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("CPU", value)).foregroundStyle(.tint) } }
-                .chartYScale(domain: 0...100).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 36).transaction { $0.animation = nil }.accessibilityLabel("CPU usage history")
+            Chart(model.cpuHistory) { point in if let value = point.value { LineMark(x: .value("Second", point.id), y: .value("CPU", value)).interpolationMethod(.monotone).foregroundStyle(.tint) } }
+                .chartYScale(domain: 0...100).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 36).smoothTelemetryChart(latest: model.cpuHistory.last?.id ?? 0, window: model.historyMinutes * 60).accessibilityLabel("CPU usage history")
             HStack(spacing: 5) {
                 ForEach(model.snapshot.cpu.cores) { core in
                     VStack(spacing: 3) {
@@ -405,7 +405,7 @@ private struct CardView: View {
         VStack(spacing: 7) {
             usageCapsule(model.snapshot.memory.usedPercent, tint: .blue)
             rows([("Used", model.formatBytes(model.snapshot.memory.used)), ("Free", model.formatBytes(model.snapshot.memory.free)), ("App memory", model.formatBytes(model.snapshot.memory.app)), ("Cached files", model.formatBytes(model.snapshot.memory.cached)), ("Wired", model.formatBytes(model.snapshot.memory.wired)), ("Compressed", model.formatBytes(model.snapshot.memory.compressed)), ("Swap used", model.formatBytes(model.snapshot.memory.swapUsed)), ("Page in / out per sec", "\(DisplayValue.decimal(model.snapshot.memory.pageInPerSecond, digits: 0)) / \(DisplayValue.decimal(model.snapshot.memory.pageOutPerSecond, digits: 0))"), ("Pressure", model.snapshot.memory.pressure ?? "n/a")])
-            Chart(model.memoryHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Used %", v)).foregroundStyle(.blue) } }.chartYScale(domain: 0...100).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).transaction { $0.animation = nil }
+            Chart(model.memoryHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Used %", v)).interpolationMethod(.monotone).foregroundStyle(.blue) } }.chartYScale(domain: 0...100).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).smoothTelemetryChart(latest: model.memoryHistory.last?.id ?? 0, window: model.historyMinutes * 60)
         }
     }
     private var disk: some View {
@@ -413,8 +413,8 @@ private struct CardView: View {
             usageCapsule(model.snapshot.disk.total.flatMap { total in model.snapshot.disk.free.map { Double(total - $0) / Double(total) * 100 } }, tint: .purple)
             rows([("Volume", model.snapshot.disk.volumeName ?? "n/a"), ("File system", model.snapshot.disk.fileSystem ?? "n/a"), ("Available incl. purgeable", model.formatBytes(model.snapshot.disk.importantFree)), ("Boot volume used", model.snapshot.disk.total.flatMap { total in model.snapshot.disk.free.map { model.formatBytes(total - $0) } } ?? "n/a"), ("Available", model.formatBytes(model.snapshot.disk.free)), ("Total", model.formatBytes(model.snapshot.disk.total)), ("SMART status", model.snapshot.disk.smartStatus ?? "n/a"), ("Read", rate(model.snapshot.diskIO.readBytesPerSecond)), ("Write", rate(model.snapshot.diskIO.writeBytesPerSecond)), ("Read IOPS", DisplayValue.decimal(model.snapshot.diskIO.readIOPS, digits: 0)), ("Write IOPS", DisplayValue.decimal(model.snapshot.diskIO.writeIOPS, digits: 0))])
             ForEach(model.snapshot.disk.externalVolumes) { volume in rows([(volume.name, "\(model.formatBytes(volume.free)) / \(model.formatBytes(volume.total))")]) }
-            Chart { ForEach(model.diskReadHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Series", OverlayL10n.text("Read", locale: model.locale))) } }; ForEach(model.diskWriteHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Series", OverlayL10n.text("Write", locale: model.locale))) } } }
-                .chartForegroundStyleScale([OverlayL10n.text("Read", locale: model.locale): Color.blue, OverlayL10n.text("Write", locale: model.locale): Color.orange]).chartLegend(position: .bottom, alignment: .leading, spacing: 4).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 44).transaction { $0.animation = nil }
+            Chart { ForEach(model.diskReadHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).interpolationMethod(.monotone).foregroundStyle(by: .value("Series", OverlayL10n.text("Read", locale: model.locale))) } }; ForEach(model.diskWriteHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).interpolationMethod(.monotone).foregroundStyle(by: .value("Series", OverlayL10n.text("Write", locale: model.locale))) } } }
+                .chartForegroundStyleScale([OverlayL10n.text("Read", locale: model.locale): Color.blue, OverlayL10n.text("Write", locale: model.locale): Color.orange]).chartLegend(position: .bottom, alignment: .leading, spacing: 4).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 44).smoothTelemetryChart(latest: model.diskReadHistory.last?.id ?? 0, window: model.historyMinutes * 60)
         }
     }
     private var bluetooth: some View {
@@ -435,9 +435,9 @@ private struct CardView: View {
         VStack(spacing: 7) {
             rows([("Down", rate(model.snapshot.network.downBytesPerSecond)), ("Up", rate(model.snapshot.network.upBytesPerSecond)), ("Wi-Fi RSSI", model.snapshot.network.rssi.map { "\($0) dBm" } ?? "n/a"), ("Channel", model.snapshot.network.channel ?? "n/a"), ("Link rate", DisplayValue.decimal(model.snapshot.network.linkMbps, digits: 0, suffix: " Mbps")), ("Latency", model.snapshot.network.latencyMs.map { DisplayValue.decimal($0, digits: 0, suffix: " ms") } ?? "n/a")])
             Chart {
-                ForEach(model.networkDownHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Direction", "Down")) } }
-                ForEach(model.networkUpHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Direction", "Up")) } }
-            }.chartForegroundStyleScale(["Down": Color.blue, "Up": Color.orange]).chartLegend(.hidden).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).transaction { $0.animation = nil }
+                ForEach(model.networkDownHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).interpolationMethod(.monotone).foregroundStyle(by: .value("Direction", "Down")) } }
+                ForEach(model.networkUpHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).interpolationMethod(.monotone).foregroundStyle(by: .value("Direction", "Up")) } }
+            }.chartForegroundStyleScale(["Down": Color.blue, "Up": Color.orange]).chartLegend(.hidden).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 34).smoothTelemetryChart(latest: model.networkDownHistory.last?.id ?? 0, window: model.historyMinutes * 60)
         }
     }
     private var thermal: some View {
@@ -449,8 +449,8 @@ private struct CardView: View {
                     let values = model.snapshot.temperatures.sensors.filter { $0.group == group }.map(\.celsius)
                     if !values.isEmpty { rows([(group, "avg \(temperature(values.reduce(0, +) / Double(values.count))) · max \(temperature(values.max()))")]) }
                 }
-                Chart(model.temperatureHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("°C", v)).foregroundStyle(.red) } }
-                    .chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 30).transaction { $0.animation = nil }
+                Chart(model.temperatureHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("°C", v)).interpolationMethod(.monotone).foregroundStyle(.red) } }
+                    .chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 30).smoothTelemetryChart(latest: model.temperatureHistory.last?.id ?? 0, window: model.historyMinutes * 60)
                 HStack(spacing: 1) { ForEach(Array(model.thermalTimeline.enumerated()), id: \.offset) { _, state in Rectangle().fill(stateColor(state)).frame(height: 6) } }.clipShape(Capsule())
             }
         }
