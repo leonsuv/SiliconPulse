@@ -62,6 +62,11 @@ struct SettingsView: View {
                         Text("System").tag("System"); Text("English").tag("en"); Text("Deutsch").tag("de")
                     }
                 }
+                Section("Energy") {
+                    LowPowerModeControl()
+                    Text("Changing Low Power Mode requires administrator authorization.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Section("Sampling and panel") {
                     Picker("Appearance", selection: $settings.appearance) {
                         Text("System").tag("System"); Text("Light").tag("Light"); Text("Dark").tag("Dark")

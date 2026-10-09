@@ -13,7 +13,7 @@ struct PowerReading: Sendable {
     var eResidency: Double?; var pResidency: Double?
     static let unavailable = PowerReading(cpu: nil, gpu: nil, ane: nil, dram: nil, combined: nil, eFrequencyMHz: nil, pFrequencyMHz: nil, gpuFrequencyMHz: nil, eResidency: nil, pResidency: nil)
 }
-struct CoreUsage: Identifiable, Sendable { let id: Int; let percent: Double; let kind: String; let number: Int }
+struct CoreUsage: Identifiable, Sendable { let id: Int; let percent: Double; let kind: String; let number: Int; var user: Double? = nil; var kernel: Double? = nil }
 struct CPUReading: Sendable { var cores: [CoreUsage] = []; var load: Double?; var thermalState: Int; var user: Double? = nil; var system: Double? = nil; var idle: Double? = nil; var loadAverage: [Double] = []; var processCount: Int? = nil; var eAverage: Double? = nil; var pAverage: Double? = nil }
 struct GPUReading: Sendable { var utilization: Double?; var rendererUtilization: Double?; var tilerUtilization: Double?; var memoryInUse: UInt64?; var coreCount: Int? }
 struct MemoryReading: Sendable { var used: UInt64?; var wired: UInt64?; var compressed: UInt64?; var pressure: String?; var free: UInt64? = nil; var app: UInt64? = nil; var cached: UInt64? = nil; var swapUsed: UInt64? = nil; var pageInPerSecond: Double? = nil; var pageOutPerSecond: Double? = nil; var usedPercent: Double? = nil }

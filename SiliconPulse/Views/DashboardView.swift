@@ -36,62 +36,80 @@ struct DashboardView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let wide = geometry.size.width >= 560
-            let short = geometry.size.height < 600
             VStack(spacing: 0) {
                 header
                 if !panelController.editMode {
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack(alignment: .firstTextBaseline) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Your Mac, at a glance").font(.system(size: short ? 18 : 22, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.75)
-                                Text(model.snapshot.system.chip ?? "Apple Silicon").font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                            Label("Live", systemImage: "circle.fill")
-                                .font(.caption.weight(.medium)).foregroundStyle(.green)
-                                .labelStyle(.titleAndIcon)
+                    Picker("Category", selection: Binding(get: { category }, set: { panelController.category = $0 })) {
+                        ForEach(["Overview", "Performance", "Energy", "System"], id: \.self) {
+                            Text(LocalizedStringKey($0)).tag($0)
                         }
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: wide || short ? 4 : 2), spacing: 10) {
-                            GlanceTile(title: "CPU", value: model.value(for: "CPU %"), points: model.cpuHistory, color: .blue, compact: short)
-                            GlanceTile(title: "GPU", value: model.value(for: "GPU %"), points: model.gpuHistory, color: .teal, compact: short)
-                            GlanceTile(title: "Memory", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple, compact: short)
-                            GlanceTile(title: "Battery W", value: model.value(for: "Battery W"), points: model.batteryPowerHistory, color: .orange, compact: short)
-                        }
-                        Picker("Category", selection: Binding(get: { category }, set: { panelController.category = $0 })) {
-                            ForEach(["Overview", "Performance", "Energy", "System"], id: \.self) { Text(LocalizedStringKey($0)).tag($0) }
-                        }.pickerStyle(.segmented).labelsHidden()
-                    }.padding(18)
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                    .padding(.horizontal, 14).padding(.bottom, 12)
                 }
                 Divider()
                 ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: wide && !panelController.editMode ? 2 : 1), alignment: .leading, spacing: 12) {
-                        ForEach(cards, id: \.self) { title in
-                            CardView(title: title, isHidden: !model.visibleSections.contains(title), editMode: panelController.editMode, expansion: Binding(get: { category == "Overview" ? panelController.overviewExpanded.contains(title) : model.expanded.contains(title) }, set: { value in
-                                    if category == "Overview" { if value { panelController.overviewExpanded.insert(title) } else { panelController.overviewExpanded.remove(title) } }
-                                    else { if value { model.expanded.insert(title) } else { model.expanded.remove(title) } }
-                                }))
-                                .onDrop(of: [UTType.plainText], delegate: SectionDropDelegate(section: title, model: model, enabled: panelController.editMode))
+                    VStack(alignment: .leading, spacing: 10) {
+                        if category == "Overview", !panelController.editMode {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: geometry.size.width >= 650 ? 4 : 2), spacing: 8) {
+                                GlanceTile(title: "CPU", value: model.value(for: "CPU %"), points: model.cpuHistory, color: .blue)
+                                GlanceTile(title: "GPU", value: model.value(for: "GPU %"), points: model.gpuHistory, color: .teal)
+                                GlanceTile(title: "Memory", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple)
+                                GlanceTile(title: "Battery power", value: model.value(for: "Battery W"), points: model.batteryPowerHistory, color: .orange)
+                            }
+                            .padding(.bottom, 4)
+                            .background { WindowDragHandle(enabled: panelController.isPinned) }
                         }
-                    }.padding(16)
-                    if cards.isEmpty { ContentUnavailableView("No visible sections", systemImage: "rectangle.3.group", description: Text("Use Edit cards to choose what appears here.")) }
-                    if panelController.editMode {
-                        Button("Reset layout…") { panelController.showLayoutResetConfirmation = true }
-                            .padding(.bottom, 16)
-                            .confirmationDialog("Reset card layout?", isPresented: Binding(get: { panelController.showLayoutResetConfirmation }, set: { panelController.showLayoutResetConfirmation = $0 }), titleVisibility: .visible) {
-                                Button("Reset Layout", role: .destructive) { model.resetLayout(); panelController.overviewExpanded.removeAll() }
-                            } message: { Text("Restore the default card order, visibility, and expanded state.") }
+                        if category == "Energy", !panelController.editMode {
+                            LowPowerModeControl().toggleStyle(.switch)
+                                .padding(12)
+                                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        // One continuous column keeps related measurements together.
+                        ForEach(cards, id: \.self) { title in
+                            CardView(title: title, isHidden: !model.visibleSections.contains(title), editMode: panelController.editMode, expansion: Binding(get: {
+                                category == "Overview" ? panelController.overviewExpanded.contains(title) : model.expanded.contains(title)
+                            }, set: { value in
+                                if category == "Overview" {
+                                    if value { panelController.overviewExpanded.insert(title) } else { panelController.overviewExpanded.remove(title) }
+                                } else {
+                                    if value { model.expanded.insert(title) } else { model.expanded.remove(title) }
+                                }
+                            }))
+                            .onDrop(of: [UTType.plainText], delegate: SectionDropDelegate(section: title, model: model, enabled: panelController.editMode))
+                        }
+                        if cards.isEmpty {
+                            ContentUnavailableView("No visible sections", systemImage: "rectangle.3.group", description: Text("Use Edit cards to choose what appears here."))
+                        }
+                        if panelController.editMode {
+                            Button("Reset layout…") { panelController.showLayoutResetConfirmation = true }
+                                .padding(.vertical, 8)
+                                .confirmationDialog("Reset card layout?", isPresented: Binding(get: { panelController.showLayoutResetConfirmation }, set: { panelController.showLayoutResetConfirmation = $0 }), titleVisibility: .visible) {
+                                    Button("Reset Layout", role: .destructive) { model.resetLayout(); panelController.overviewExpanded.removeAll() }
+                                } message: { Text("Restore the default card order, visibility, and expanded state.") }
+                        }
                     }
-                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                }
+                .id(category + (panelController.editMode ? "-editing" : "-reading"))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
                 Divider()
                 HStack(spacing: 12) {
-                    Image(systemName: "lock.shield").foregroundStyle(.secondary)
-                    Text("On-device monitoring").lineLimit(1)
+                    Label("Live", systemImage: "circle.fill").foregroundStyle(.green)
                     Spacer(minLength: 0)
+                    Button("Details") { MonitorWindowController.shared.show() }
+                        .help("Open monitor")
                     Button { model.copySnapshot() } label: { Image(systemName: "doc.on.doc") }
                         .help("Copy snapshot").accessibilityLabel("Copy snapshot")
-                    Menu { Button("Quit SiliconPulse") { NSApp.terminate(nil) } } label: { Image(systemName: "ellipsis.circle") }
-                        .menuStyle(.borderlessButton).fixedSize().accessibilityLabel("More actions")
+                    Menu {
+                        Button("Overlay mode") { OverlayController.active?.toggle() }
+                        Button("Edit cards") { panelController.editMode.toggle() }
+                        Divider()
+                        Button("Quit SiliconPulse") { NSApp.terminate(nil) }
+                    } label: { Image(systemName: "ellipsis.circle") }
+                    .menuStyle(.borderlessButton).fixedSize().accessibilityLabel("More actions")
                     if panelController.isPinned {
                         Image(systemName: "arrow.up.left.and.arrow.down.right").foregroundStyle(.tertiary)
                             .gesture(DragGesture(minimumDistance: 1).onChanged { value in
@@ -100,14 +118,13 @@ struct DashboardView: View {
                             }.onEnded { _ in panelController.resizeStartSize = nil })
                             .accessibilityLabel("Resize panel")
                     }
-                }.buttonStyle(.plain).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 18).padding(.vertical, 12)
+                }.buttonStyle(.plain).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.vertical, 10)
             }
         }
         .frame(minWidth: 340, idealWidth: 420, maxWidth: .infinity, minHeight: 420, maxHeight: .infinity)
         .background { ZStack { Rectangle().fill(.regularMaterial); Color(nsColor: .windowBackgroundColor).opacity(0.88) } }
         .opacity(panelController.isPinned ? model.panelOpacity : 1)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.primary.opacity(0.08), lineWidth: 1))
         .environment(\.locale, model.locale)
     }
 
@@ -115,7 +132,10 @@ struct DashboardView: View {
         HStack(spacing: 6) {
             Image(systemName: "waveform.path.ecg").font(.system(size: 15, weight: .semibold)).foregroundStyle(.blue)
                 .frame(width: 30, height: 30).background(.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-            Text("SiliconPulse").font(.system(size: 14, weight: .semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("SiliconPulse").font(.system(size: 14, weight: .semibold))
+                Text(model.snapshot.system.chip ?? "Apple Silicon").font(.caption2).foregroundStyle(.secondary)
+            }
             Spacer(minLength: 0)
             Button { OverlayController.active?.toggle() } label: { Image(systemName: "rectangle.dashed") }
                 .help(Text(OverlayL10n.text("Overlay mode", locale: model.locale))).accessibilityLabel(OverlayL10n.text("Overlay mode", locale: model.locale))
@@ -164,24 +184,29 @@ private struct GlanceTile: View {
     let value: String
     let points: [TelemetryPoint]
     let color: Color
-    var compact = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 5) {
                 Circle().fill(color).frame(width: 5, height: 5)
-                Text(LocalizedStringKey(title)).font(.caption.weight(.medium)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+                Text(LocalizedStringKey(title)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
-            Text(value).font(.system(size: compact ? 15 : 25, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
-            Chart(points) { point in
-                if let sample = point.value {
-                    AreaMark(x: .value("Time", point.id), y: .value(title, sample)).foregroundStyle(LinearGradient(colors: [color.opacity(0.18), color.opacity(0.01)], startPoint: .top, endPoint: .bottom))
-                    LineMark(x: .value("Time", point.id), y: .value(title, sample)).foregroundStyle(color).lineStyle(StrokeStyle(lineWidth: 1.5))
-                }
-            }.chartXAxis(.hidden).chartYAxis(.hidden).frame(height: compact ? 14 : 24).transaction { $0.animation = nil }
-                .accessibilityLabel(Text("\(title) history"))
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(compact ? 8 : 13)
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(color.opacity(0.12), lineWidth: 1))
+            HStack(alignment: .center, spacing: 8) {
+                Text(value).font(.system(size: 20, weight: .semibold)).monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Chart(points) { point in
+                    if let sample = point.value {
+                        LineMark(x: .value("Time", point.id), y: .value(title, sample))
+                            .foregroundStyle(color).lineStyle(StrokeStyle(lineWidth: 1.5))
+                    }
+                }.chartXAxis(.hidden).chartYAxis(.hidden)
+                    .frame(width: 46, height: 20).clipped().transaction { $0.animation = nil }
+                    .accessibilityLabel(Text("\(title) history"))
+            }
+        }
+        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -213,7 +238,11 @@ private struct CardView: View {
                         Image(systemName: icon).foregroundStyle(tint).frame(width: 28, height: 28).background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
                         Text(LocalizedStringKey(title)).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
 
-                        Spacer(minLength: 3)
+                        Spacer(minLength: 8)
+                        if !editMode && !isExpanded {
+                            Text(summary(for: title)).font(.system(size: 13, weight: .medium)).monospacedDigit()
+                                .foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.8)
+                        }
                         if !editMode { Image(systemName: isExpanded ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(.secondary) }
                     }.contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityAddTraits(.isButton)
@@ -223,14 +252,7 @@ private struct CardView: View {
                     }.buttonStyle(.plain).help(isHidden ? Text("Show card") : Text("Hide card"))
                         .accessibilityLabel(isHidden ? "Show \(title)" : "Hide \(title)")
                 }
-            }.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading).padding(.horizontal, 14)
-            if !editMode && !isExpanded {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(summary(for: title)).font(.system(size: 25, weight: .semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
-                    Spacer(minLength: 0)
-                    Text(LocalizedStringKey(previewCaption)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }.padding(.horizontal, 14).padding(.bottom, 16)
-            }
+            }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.horizontal, 14)
             if !editMode && isExpanded {
                 Divider().padding(.horizontal, 10)
                 content.frame(maxWidth: .infinity, alignment: .leading).padding(14)
@@ -276,7 +298,7 @@ private struct CardView: View {
         case "Battery": return model.value(for: "Battery %")
         case "Power": return model.value(for: "Power W")
         case "Disk": return model.formatRate(model.snapshot.diskIO.readBytesPerSecond)
-        case "Thermal": return thermalName
+        case "Thermal": return OverlayL10n.text(thermalName, locale: model.locale)
         case "Processes": return DisplayValue.number(model.snapshot.cpu.processCount)
         case "System": return model.snapshot.system.chip ?? "Apple Silicon"
         case "Sleep blockers": return String(model.snapshot.sleepBlockers.count)
@@ -391,8 +413,8 @@ private struct CardView: View {
             usageCapsule(model.snapshot.disk.total.flatMap { total in model.snapshot.disk.free.map { Double(total - $0) / Double(total) * 100 } }, tint: .purple)
             rows([("Volume", model.snapshot.disk.volumeName ?? "n/a"), ("File system", model.snapshot.disk.fileSystem ?? "n/a"), ("Available incl. purgeable", model.formatBytes(model.snapshot.disk.importantFree)), ("Boot volume used", model.snapshot.disk.total.flatMap { total in model.snapshot.disk.free.map { model.formatBytes(total - $0) } } ?? "n/a"), ("Available", model.formatBytes(model.snapshot.disk.free)), ("Total", model.formatBytes(model.snapshot.disk.total)), ("SMART status", model.snapshot.disk.smartStatus ?? "n/a"), ("Read", rate(model.snapshot.diskIO.readBytesPerSecond)), ("Write", rate(model.snapshot.diskIO.writeBytesPerSecond)), ("Read IOPS", DisplayValue.decimal(model.snapshot.diskIO.readIOPS, digits: 0)), ("Write IOPS", DisplayValue.decimal(model.snapshot.diskIO.writeIOPS, digits: 0))])
             ForEach(model.snapshot.disk.externalVolumes) { volume in rows([(volume.name, "\(model.formatBytes(volume.free)) / \(model.formatBytes(volume.total))")]) }
-            Chart { ForEach(model.diskReadHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Series", "Read")) } }; ForEach(model.diskWriteHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Series", "Write")) } } }
-                .chartForegroundStyleScale(["Read": Color.blue, "Write": Color.orange]).chartLegend(position: .bottom, alignment: .leading, spacing: 4).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 44).transaction { $0.animation = nil }
+            Chart { ForEach(model.diskReadHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Series", OverlayL10n.text("Read", locale: model.locale))) } }; ForEach(model.diskWriteHistory) { p in if let v = p.value { LineMark(x: .value("Second", p.id), y: .value("Rate", v)).foregroundStyle(by: .value("Series", OverlayL10n.text("Write", locale: model.locale))) } } }
+                .chartForegroundStyleScale([OverlayL10n.text("Read", locale: model.locale): Color.blue, OverlayL10n.text("Write", locale: model.locale): Color.orange]).chartLegend(position: .bottom, alignment: .leading, spacing: 4).chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 44).transaction { $0.animation = nil }
         }
     }
     private var bluetooth: some View {
@@ -420,7 +442,7 @@ private struct CardView: View {
     }
     private var thermal: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack { Circle().fill(thermalColor).frame(width: 9, height: 9); Text(thermalName).foregroundStyle(.primary); Spacer() }
+            HStack { Circle().fill(thermalColor).frame(width: 9, height: 9); Text(LocalizedStringKey(thermalName)).foregroundStyle(.primary); Spacer() }
             if !model.snapshot.temperatures.sensors.isEmpty {
                 let groups = ["CPU/SoC", "Battery", "SSD", "Other"]
                 ForEach(groups, id: \.self) { group in

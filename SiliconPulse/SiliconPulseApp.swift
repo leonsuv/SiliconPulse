@@ -22,6 +22,9 @@ import AppKit
         NSApplication.shared.setActivationPolicy(UserDefaults.standard.bool(forKey: "showDockIcon") ? .regular : .accessory)
         let model = AppModel.shared
         model.applyAppearance()
+        if let argument = args.first(where: { $0.hasPrefix("--monitor-qa=") }) {
+            Task { @MainActor in await MonitorRenderQA.run(to: String(argument.dropFirst("--monitor-qa=".count))) }
+        }
         if let snapshotArg = args.first(where: { $0.hasPrefix("--ui-snapshot=") }) {
             let domain = Bundle.main.bundleIdentifier ?? "io.github.leonsuv.SiliconPulse"
             let saved = UserDefaults.standard.persistentDomain(forName: domain) ?? [:]
@@ -60,13 +63,15 @@ import AppKit
             rightClickRecognizer = rightClick
             panelController.setStatusButton(button)
         }
+        if args.contains("--monitor-open") { MonitorWindowController.shared.show() }
         model.startMenuTimer()
         updateStatusLabel()
         menuTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.updateStatusLabel() }
         }
         menuTimer?.tolerance = 1
-        if overlayController.isActive { overlayController.restoreOnLaunch() }
+        if args.contains(where: { $0.hasPrefix("--monitor-qa=") }) { /* Explicit QA starts with only its monitor window. */ }
+        else if overlayController.isActive { overlayController.restoreOnLaunch() }
         else if (UserDefaults.standard.object(forKey: "reopenPinnedAtLaunch") as? Bool ?? true), panelController.isPinned {
             panelController.show()
         }
@@ -163,6 +168,9 @@ import AppKit
         pin.target = self
         menu.addItem(pin)
         menu.addItem(.separator())
+        let monitor = NSMenuItem(title: OverlayL10n.text("Open monitor…", locale: AppModel.shared.locale), action: #selector(openMonitor), keyEquivalent: "0")
+        monitor.target = self
+        menu.addItem(monitor)
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
@@ -181,6 +189,8 @@ import AppKit
     @objc private func togglePin() { panelController.setPinned(!panelController.isPinned) }
     @objc private func toggleOverlay() { overlayController.toggle() }
     @objc private func moveOverlay() { overlayController.beginMoveMode() }
+    @objc private func openMonitor() { MonitorWindowController.shared.show() }
+
     @objc private func openSettings() {
         SettingsWindowController.shared.show(model: AppModel.shared)
     }

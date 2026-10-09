@@ -18,16 +18,18 @@ struct CPUCollector {
         var cores: [CoreUsage] = []
         for index in 0..<Int(processors) {
             let base = index * Int(CPU_STATE_MAX)
-            guard base + 3 < values.count else { continue }
+            guard base + 3 < values.count, let old, old.count > base + 3 else { continue }
             let total = (0..<4).reduce(UInt32(0)) { $0 &+ values[base + $1] }
-            let oldTotal = old.flatMap { oldValues in oldValues.count > base + 3 ? (0..<4).reduce(UInt32(0)) { sum, offset in sum &+ oldValues[base + offset] } : nil }
-            let oldIdle = old.flatMap { $0.count > base + Int(CPU_STATE_IDLE) ? $0[base + Int(CPU_STATE_IDLE)] : nil }
-            let delta = oldTotal.map { total &- $0 } ?? 0
-            let idleDelta = oldIdle.map { values[base + Int(CPU_STATE_IDLE)] &- $0 } ?? 0
+            let oldTotal = (0..<4).reduce(UInt32(0)) { $0 &+ old[base + $1] }
+            let oldIdle = old[base + Int(CPU_STATE_IDLE)]
+            let delta = total &- oldTotal
+            let idleDelta = values[base + Int(CPU_STATE_IDLE)] &- oldIdle
             let use = delta > 0 ? Double(delta &- idleDelta) / Double(delta) : 0
             let kind = index < eCount ? "E" : "P"
             if kind == "E" { eNumber += 1 } else { pNumber += 1 }
-            cores.append(CoreUsage(id: index, percent: max(0, min(1, use)), kind: kind, number: kind == "E" ? eNumber : pNumber))
+            let userTicks = (values[base + Int(CPU_STATE_USER)] &- old[base + Int(CPU_STATE_USER)]) &+ (values[base + Int(CPU_STATE_NICE)] &- old[base + Int(CPU_STATE_NICE)])
+            let kernelTicks = values[base + Int(CPU_STATE_SYSTEM)] &- old[base + Int(CPU_STATE_SYSTEM)]
+            cores.append(CoreUsage(id: index, percent: max(0, min(1, use)), kind: kind, number: kind == "E" ? eNumber : pNumber, user: delta > 0 ? Double(userTicks) / Double(delta) : nil, kernel: delta > 0 ? Double(kernelTicks) / Double(delta) : nil))
         }
         let load = cores.isEmpty ? nil : cores.map(\.percent).reduce(0, +) / Double(cores.count)
         let eValues = cores.filter { $0.kind == "E" }.map(\.percent)

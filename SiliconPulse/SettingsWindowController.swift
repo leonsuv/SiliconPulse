@@ -52,7 +52,7 @@ import SwiftUI
     private func hideSwiftUISettingsScene(except settingsWindow: NSWindow) {
         for candidate in NSApp.windows where candidate !== settingsWindow {
             if candidate is ManagedPanel || candidate is OverlayPanel { continue }
-            candidate.orderOut(nil)
+            if candidate.title.localizedCaseInsensitiveContains("settings") || candidate.title.localizedCaseInsensitiveContains("einstellungen") { candidate.orderOut(nil) }
         }
     }
 }

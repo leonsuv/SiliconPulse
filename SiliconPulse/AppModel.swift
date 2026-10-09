@@ -15,6 +15,8 @@ import UserNotifications
     static let allSections = ["Battery", "Power", "GPU", "CPU", "Memory", "Disk", "Network", "Thermal", "Processes", "Sleep blockers", "System", "Bluetooth", "Fans"]
     static let menuOptions = ["Battery %", "Battery W", "CPU %", "GPU %", "RAM %", "Disk I/O", "Net down", "Net up", "Temperature", "Power W"]
 
+    let lowPowerMode = LowPowerModeModel()
+
     var snapshot = TelemetrySnapshot()
     var cpuHistory: [TelemetryPoint] = []; var gpuHistory: [TelemetryPoint] = []
     let overlayMetricStates = Dictionary(uniqueKeysWithValues: OverlayPreferences.allMetrics.map { ($0, OverlayMetricState()) })
@@ -112,6 +114,7 @@ import UserNotifications
         overlayTask = Task { @MainActor [weak self] in
             guard let self else { return }
             while !Task.isCancelled && self.overlaySampling {
+                await self.lowPowerMode.refresh()
                 self.sampleOverlay(metrics: metrics)
                 try? await Task.sleep(for: .seconds(max(0.5, interval)))
             }
@@ -279,6 +282,7 @@ import UserNotifications
         sampleDates[key] = now; return true
     }
     private func sampleMenuMetric() async {
+        await lowPowerMode.refresh()
         snapshot.battery = BatteryCollector().collect()
         for metric in menuMetrics {
             switch metric {
@@ -299,6 +303,7 @@ import UserNotifications
         onMenuLabelUpdate?()
     }
     private func samplePopover() async {
+        await lowPowerMode.refresh()
         let now = Date(); chartIndex += 1
         if (visibleSections.contains("Battery") || menuMetrics.contains("Battery %") || menuMetrics.contains("Battery W")), due("Battery", every: 1, now: now) {
             snapshot.battery = BatteryCollector().collect()

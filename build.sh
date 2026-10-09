@@ -42,5 +42,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict></plist>
 PLIST
+clang -O3 -std=c11 -mmacosx-version-min=14.0 Native/Scanner/fasttree-scan.c -o "$APP/Contents/Resources/siliconpulse-scan" -lpthread
+codesign --force --sign - "$APP/Contents/Resources/siliconpulse-scan"
+cp Native/Scanner/LICENSE "$APP/Contents/Resources/FastTree-LICENSE.txt"
+cp SiliconPulse/Workbench/PortPeek-LICENSE.txt "$APP/Contents/Resources/PortPeek-LICENSE.txt"
 cp Tools/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --deep --sign - "$APP"

@@ -17,6 +17,26 @@ SiliconPulse ist ein nativer macOS-Menüleistenmonitor für Apple Silicon. Dashb
 - SwiftUI, AppKit und Swift Charts ohne Drittanbieterpakete.
 - Das Dashboard misst nur, solange es sichtbar ist. Im geschlossenen Zustand misst die App Batterie und ausgewählten Menüleistenwert alle fünf Sekunden.
 
+
+## Monitorfenster
+
+**Details** im Panel oder **Monitor öffnen …** im Menü öffnet das neue, vergrößerbare Monitorfenster. Die Menüleisten-App bleibt erhalten.
+
+- Übersicht und Leistungsansichten für CPU, E-/P-Kerne, GPU, Speicher, SSD, Netzwerk, Energie und Temperaturen.
+- Prozessliste, Prozessbaum, Filter, Benutzersummen und Details. Eigene Prozesse lassen sich nach Bestätigung beenden.
+- Hardwareinformationen, Autostart und launchd-Dienste; geschützte macOS-Dienste bleiben unveränderbar.
+- Sensortabelle mit Minimum/Maximum, Apple-Silicon-Kernverläufe und verfügbare Frequenzen/Verweildauern.
+- Lokale Aufzeichnung mit Export, Zeitleiste und Wiedergabe. Netzwerkverbindungen einschließlich TCP, UDP und lokaler IPC.
+- Installierte Apps, Größenberechnung, zugehörige Dateien und bestätigtes Verschieben in den Papierkorb. Treiberinformationen und Finder-Aktionen.
+- Ordneranalyse mit Flächenkarte/Kreisen, Suche, größten Dateien, Dateitypen und gespeicherten Scans.
+- Lokale CPU-, Metal-GPU- und SSD-Benchmarks, optionaler Internettest sowie ein ausdrücklich nicht standardisierter SiliconPulse-Index.
+
+Messwerte hängen von macOS und Hardware ab. Nicht verfügbare Werte erscheinen als **n/a**; es gibt keine Beispielwerte oder Pro-Sperren. Internettests übertragen Daten und starten ausschließlich per Schaltfläche.
+
+Das Monitorfenster misst nur, solange es geöffnet ist. Eine ausdrücklich gestartete Aufzeichnung läuft auch bei geschlossenem Fenster weiter. Administratorrechte sind für Messungen nicht erforderlich; einzelne Änderungen an systemweiten Diensten oder am Energiesparmodus können eine macOS-Administratorabfrage benötigen.
+
+Die Speicheranalyse nutzt den MIT-lizenzierten Scanner aus [FastTree](https://github.com/leonsuv/FastTree), die Socketabfrage verwendet Ansätze aus [PortPeek](https://github.com/leonsuv/PortPeek). Private IOReport-Aufrufe bleiben in einer Datei. CLPC-Zählerkennungen und DVFS-Protokolldaten folgen der dokumentierten [macmon-Recherche](https://github.com/vladkens/macmon); macmon-Code wurde nicht übernommen.
+
 ## Screenshots
 
 <picture>

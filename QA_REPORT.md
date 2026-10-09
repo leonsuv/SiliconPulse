@@ -22,3 +22,42 @@
 
 - `./build.sh` completed and ad-hoc signed `SiliconPulse.app`.
 - The single battery-health smoke test was attempted once. Local `swift test` stopped before running it because this machine's Command Line Tools could not resolve XCTest (`unable to resolve module dependency: 'XCTest'`). GitHub Actions has a smoke-test step on `macos-15`; its hosted result is pending publication.
+
+## Native monitor feature pass (2026-10-09)
+
+### Scope and implementation
+
+The separate, retained Monitor window now exposes the fifteen functional areas from the supplied reference screenshots: Summary, Performance, Processes, System Info, Startup apps, Users, Services, Power & Frequency, Apple Silicon, Flight Recorder, Connections, Installed Apps, Drivers, Disk Space, and Benchmarks. The compact menu bar panel remains available; its Details button and status-item menu open the Monitor.
+
+The owner's accessible GitHub projects were checked. FastTree's MIT-licensed native scanner/index and PortPeek's MIT-licensed socket parsing approach were reused with attribution. No accessible TMOG source repository was found. Hardware counters and the remaining UI/controllers were implemented in Swift; unavailable hardware readings remain `n/a`. The scanner is compiled and signed inside the app bundle; QA tools are excluded from the app target.
+
+### Local verification
+
+`./build.sh` completed successfully on Apple M4 / macOS 27. The explicit `--monitor-qa` mode exercised all fifteen sections without a crash, rendered them locally, and collected all fourteen hardware inventory categories. Representative Summary, CPU, Processes, Drivers, Installed Apps, scanner and Flight Recorder renders were visually inspected, including the German light appearance. Local live-data images stay outside the repository.
+
+| Check | Observed result |
+| --- | --- |
+| Live telemetry | 10 CPU cores, 477 readable processes, 52 sensors |
+| CPU topology | 6 efficiency / 4 performance cores; separate user/kernel histories |
+| Power and frequency | CPU 0.966 W, GPU 0.027 W, ANE 0 W in one sample; 11 frequency sensors; memory pressure Normal |
+| Connections | 243 socket records, including process/protocol/endpoint information |
+| Services / apps / drivers | 916 service entries, 96 app bundles, 414 driver/extension entries |
+| Scanner | Two generated fixture files, 24 KiB total; drill-down, search and saved-index restore succeeded |
+| Flight Recorder | Three actual frames recorded, JSON round trip and replay succeeded |
+| Startup / services | Generated user launch agent bootstrapped, disabled/enabled and booted out successfully |
+| Process action | Only the QA-owned temporary sleep process was terminated |
+| App removal | Only the QA-created temporary app was moved to Trash and cleaned up |
+| Settings | Settings and Monitor windows were both visible after opening Settings |
+| CPU benchmark | 2,909.6 single-core / 23,546.3 multi-core Mops/s |
+| GPU benchmark | 487.1 GFLOP/s for the included Metal workload |
+| Disk benchmark | 2,835.4 MB/s write / 4,576.5 MB/s read for the temporary 64 MiB file |
+
+Benchmark results are workload-specific measurements, not standardized or comparable to Geekbench scores. APFS and storage caching can influence disk results. QA fixture changes were cleaned up; existing benchmark and scanner histories were restored.
+
+### CPU measurement and remaining limits
+
+Process CPU time was measured with `getrusage` over ten-second wall-clock intervals, expressed as a percentage of one core. With the full Monitor open: **6.77% CPU**. With Monitor closed and recording stopped: **0.75% CPU**. These are single local measurements with the menu bar timer still active. The historical under-1% goal is not achieved with the full Monitor open; further optimization remains.
+
+DRAM energy on this macOS version, NPU/media active residency where no channel is exposed, and restricted per-process GPU/NPU/private-memory/network counters show `n/a`. CPU/GPU frequency tables are validated against the exposed residency states; unsupported chips do not get guessed frequency values. Some system processes are inaccessible without additional privileges and cannot provide all process details.
+
+The internet benchmark and combined score were not executed in QA. Administrator-password flows, changes to real system services, full-volume scans, macOS 14 compatibility at runtime, and other Apple Silicon chip families were not exercised. Destructive QA actions were confined to generated fixtures. No additional unit tests were added.

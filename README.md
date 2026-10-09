@@ -13,9 +13,29 @@ Live Apple Silicon telemetry in your menu bar.
 
 SiliconPulse is a native macOS menu bar monitor for Apple Silicon. Its dashboard and optional overlay show battery, CPU, GPU, power, memory, storage, network and thermal readings.
 
-- No sudo or privileged helper is required.
+- Telemetry requires no sudo or privileged helper. Optional system-setting changes may require macOS administrator authorization.
 - SwiftUI, AppKit and Swift Charts; no third-party packages.
 - The dashboard samples while visible. When it is closed, the app samples the battery and selected menu bar metric every five seconds.
+
+
+## Monitor window
+
+Choose **Details** in the panel or **Open monitor…** in the status menu to open the resizable monitor. The menu bar app remains available.
+
+- Summary and performance views for CPU, E/P cores, GPU, memory, storage, network, energy and temperatures.
+- Searchable process list/tree, user totals and process details; confirmed termination of your own processes.
+- Hardware inventory, startup agents and launchd services. Protected macOS services cannot be changed.
+- Live sensors with minimum/maximum, Apple Silicon core histories and available frequency/residency readings.
+- Local recording, JSON export, timeline and replay; TCP, UDP and local IPC connection inspection.
+- Installed applications, on-demand sizes, related files and confirmed move to Trash; driver inventory and Finder actions.
+- Folder analysis with treemap/circles, search, largest files, file types and saved scans.
+- CPU, Metal GPU and disk benchmarks, an optional internet test and an explicitly nonstandard SiliconPulse index.
+
+Availability depends on macOS and hardware. Missing readings show **n/a**; there are no sample values or Pro gates. Internet tests transfer data and run only when started explicitly.
+
+Monitor sampling stops when its window closes or minimizes. An explicitly started recording continues with the window closed. Telemetry needs no administrator access; changing system-wide services or Low Power Mode may require macOS administrator authorization.
+
+Disk scanning incorporates the MIT-licensed native scanner from [FastTree](https://github.com/leonsuv/FastTree); socket inspection uses approaches from [PortPeek](https://github.com/leonsuv/PortPeek). All private IOReport calls remain in one file. CLPC counter identifiers and DVFS protocol facts follow the documented [macmon research](https://github.com/vladkens/macmon); no macmon source code is incorporated.
 
 ## Screenshots
 

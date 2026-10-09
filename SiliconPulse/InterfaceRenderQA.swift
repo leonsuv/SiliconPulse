@@ -19,6 +19,11 @@ import SwiftUI
             try capture(panel.panel, to: output.appendingPathComponent("dashboard-wide-\(mode).png"))
             panel.category = "Performance"
             try capture(panel.panel, to: output.appendingPathComponent("performance-\(mode).png"))
+            panel.panel.setContentSize(NSSize(width: 420, height: 640))
+            for category in ["Performance", "Energy", "System"] {
+                panel.category = category
+                try capture(panel.panel, to: output.appendingPathComponent("category-\(category.lowercased())-\(mode).png"))
+            }
             panel.editMode = true
             panel.panel.setContentSize(NSSize(width: 420, height: 660))
             try capture(panel.panel, to: output.appendingPathComponent("edit-\(mode).png"))
@@ -38,7 +43,7 @@ import SwiftUI
         print("UI_RENDER_OK: compact 420×820, wide 760×900, minimum 340×420, seven settings sections; light and dark")
     }
 
-    private static func capture(_ window: NSWindow, to url: URL) throws {
+    static func capture(_ window: NSWindow, to url: URL) throws {
         guard let view = window.contentView else { throw CocoaError(.fileWriteUnknown) }
         window.displayIfNeeded()
         view.layoutSubtreeIfNeeded()
