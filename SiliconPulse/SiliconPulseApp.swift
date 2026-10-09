@@ -22,6 +22,9 @@ import AppKit
         NSApplication.shared.setActivationPolicy(UserDefaults.standard.bool(forKey: "showDockIcon") ? .regular : .accessory)
         let model = AppModel.shared
         model.applyAppearance()
+        if let argument = args.first(where: { $0.hasPrefix("--monitor-release-capture=") }) {
+            Task { @MainActor in await MonitorReleaseCapture.run(to: String(argument.dropFirst("--monitor-release-capture=".count))) }
+        }
         if let argument = args.first(where: { $0.hasPrefix("--monitor-qa=") }) {
             Task { @MainActor in await MonitorRenderQA.run(to: String(argument.dropFirst("--monitor-qa=".count))) }
         }

@@ -4,8 +4,8 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 if [[ -f release.config ]]; then source release.config; fi
 BUNDLE_ID="${BUNDLE_ID:-io.github.leonsuv.SiliconPulse}"
-VERSION="${VERSION:-1.1.0}"
-swift build -c release
+VERSION="${VERSION:-1.2.0}"
+swift build -c release --arch arm64
 APP="$ROOT/SiliconPulse.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/SiliconPulse "$APP/Contents/MacOS/SiliconPulse"
@@ -42,7 +42,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict></plist>
 PLIST
-clang -O3 -std=c11 -mmacosx-version-min=14.0 Native/Scanner/fasttree-scan.c -o "$APP/Contents/Resources/siliconpulse-scan" -lpthread
+clang -O3 -arch arm64 -std=c11 -mmacosx-version-min=14.0 Native/Scanner/fasttree-scan.c -o "$APP/Contents/Resources/siliconpulse-scan" -lpthread
 codesign --force --sign - "$APP/Contents/Resources/siliconpulse-scan"
 cp Native/Scanner/LICENSE "$APP/Contents/Resources/FastTree-LICENSE.txt"
 cp SiliconPulse/Workbench/PortPeek-LICENSE.txt "$APP/Contents/Resources/PortPeek-LICENSE.txt"

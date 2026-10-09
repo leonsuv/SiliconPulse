@@ -187,18 +187,7 @@ private struct OverlaySparkline: View {
     let points: [TelemetryPoint]
     let color: Color
     var body: some View {
-        Chart(points.suffix(30)) { point in
-            if let value = point.value {
-                LineMark(x: .value("Time", point.id), y: .value("Value", value))
-                    .interpolationMethod(.monotone)
-                    .foregroundStyle(color)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-            }
-        }
-        .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
-        .chartYScale(domain: .automatic(includesZero: false))
-        .smoothTelemetryChart(latest: points.last?.id ?? 0, window: 30)
-        .clipped()
+        TelemetryChart(lines: [TelemetryChartLine(name: "", points: points, color: color)], window: 31, interval: OverlayPreferences.shared.refresh, fill: false)
         .accessibilityHidden(true)
     }
 }

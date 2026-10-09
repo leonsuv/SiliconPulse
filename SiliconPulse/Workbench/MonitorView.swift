@@ -143,26 +143,10 @@ struct InspectorValues: View {
 struct MetricHistory: View {
     @Environment(MonitorModel.self) private var monitor
     var keys: [String], colors: [Color], percent = false, axes = true
-    private var chart: some View {
-        Chart {
-            ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
-                ForEach(monitor.history[key] ?? []) { point in
-                    if let value = point.value { LineMark(x: .value("Time", point.id), y: .value("Value", value)).interpolationMethod(.monotone).foregroundStyle(by: .value("Metric", key)).lineStyle(StrokeStyle(lineWidth: 1.5)) }
-                }
-            }
-        }
-        .chartForegroundStyleScale(domain: keys, range: colors)
-    }
-    @ViewBuilder private var plot: some View {
-        if percent { chart.chartYScale(domain: 0...100) }
-        else { chart.chartYScale(domain: .automatic(includesZero: false)) }
-    }
     var body: some View {
-        plot
-        .chartXAxis(axes ? .automatic : .hidden).chartYAxis(axes ? .automatic : .hidden)
-        .chartLegend { if keys.count > 1 && axes { HStack(spacing: 12) { ForEach(Array(keys.enumerated()), id: \.offset) { index, key in HStack(spacing: 4) { Circle().fill(colors[min(index, colors.count - 1)]).frame(width: 7, height: 7); Text(LocalizedStringKey(key)) }.font(.caption) } } } }
-        .smoothTelemetryChart(latest: keys.compactMap { monitor.history[$0]?.last?.id }.max() ?? 0, window: 300)
-        .accessibilityLabel(Text(keys.joined(separator: ", ")))
+        TelemetryChart(lines: keys.enumerated().map { index, key in
+            TelemetryChartLine(name: key, points: monitor.history[key] ?? [], color: colors[min(index, colors.count - 1)])
+        }, percent: percent, axes: axes, legend: axes, window: 61)
     }
 }
 private func thermalName(_ state: Int) -> String { let states = ["Nominal", "Fair", "Serious", "Critical"]; return states.indices.contains(state) ? states[state] : "n/a" }
@@ -401,7 +385,7 @@ private struct FlightInspectorView: View {
                         MonitorGroup(key) {
                             if flight.isReplaying {
                                 Text(replayValue(key, flight.current?.values[key])).font(.title2).monospacedDigit()
-                                Chart(flight.points(key)) { p in if let value = p.value { LineMark(x: .value("Time", p.id), y: .value("Value", value)).interpolationMethod(.monotone).foregroundStyle(.tint) } }.chartXAxis(.hidden).frame(height: 125).smoothTelemetryChart(latest: flight.points(key).last?.id ?? 0, window: 60)
+                                TelemetryChart(lines: [TelemetryChartLine(name: key, points: flight.points(key), color: .accentColor)], axes: true, window: 61, animated: false).frame(height: 125)
                             } else { MetricHistory(keys: [key], colors: [.accentColor]).frame(height: 150) }
                         }
                     }

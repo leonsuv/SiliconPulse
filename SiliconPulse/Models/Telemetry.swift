@@ -1,6 +1,6 @@
 import Foundation
 
-struct TelemetryPoint: Identifiable, Sendable { let id: Int; let value: Double? }
+struct TelemetryPoint: Identifiable, Sendable, Equatable { let id: Int; let value: Double? }
 struct BatteryReading: Sendable {
     var percent: Double?; var charging: Bool?; var externalConnected: Bool?; var fullyCharged: Bool?
     var timeRemainingMinutes: Int?; var timeToFullMinutes: Int?; var cycles: Int?; var health: Double?

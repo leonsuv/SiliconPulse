@@ -14,7 +14,7 @@ Live Apple Silicon telemetry in your menu bar.
 SiliconPulse is a native macOS menu bar monitor for Apple Silicon. Its dashboard and optional overlay show battery, CPU, GPU, power, memory, storage, network and thermal readings.
 
 - Telemetry requires no sudo or privileged helper. Optional system-setting changes may require macOS administrator authorization.
-- SwiftUI, AppKit and Swift Charts; no third-party packages.
+- SwiftUI, AppKit and Core Animation; no third-party packages.
 - The dashboard samples while visible. When it is closed, the app samples the battery and selected menu bar metric every five seconds.
 
 
@@ -39,20 +39,17 @@ Disk scanning incorporates the MIT-licensed native scanner from [FastTree](https
 
 ## Screenshots
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/dashboard-wide-dark.png">
-  <img alt="SiliconPulse 1.1 dashboard" src="docs/assets/screenshots/dashboard-wide-light.png" width="900">
-</picture>
+![SiliconPulse 1.2 CPU performance monitor](docs/assets/screenshots/monitor-cpu-1-2.png)
 
-| Compact panel | Performance details | Settings |
+| GPU performance | Memory | Apple Silicon cores |
 |---|---|---|
-| ![Panel](docs/assets/screenshots/dashboard-light.png) | ![Performance](docs/assets/screenshots/performance-light.png) | ![Settings](docs/assets/screenshots/settings-0-light.png) |
+| ![GPU](docs/assets/screenshots/monitor-gpu-1-2.png) | ![Memory](docs/assets/screenshots/monitor-memory-1-2.png) | ![Apple Silicon](docs/assets/screenshots/monitor-silicon-1-2.png) |
 
-Screenshots show the production app views with real locally sampled telemetry. Readings vary by Mac and time. Choose System, Light, or Dark under **General → Appearance**.
+[German interface in Light Mode](docs/assets/screenshots/monitor-cpu-de-1-2.png). Captured from SiliconPulse's own windows with real telemetry; readings vary by Mac and time.
 
 ## Install
 
-1. Download [SiliconPulse-1.1.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.1.0.zip) from GitHub Releases.
+1. Download [SiliconPulse-1.2.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.2.0.zip) from GitHub Releases.
 2. Unzip it and move `SiliconPulse.app` to `/Applications`.
 3. The app is ad-hoc signed and not notarized. On first launch, Control-click it and choose **Open**, or use **System Settings → Privacy & Security → Open Anyway**. Alternatively, remove quarantine yourself:
 
@@ -108,7 +105,7 @@ The overview shows the key readings. Expand a card for details, or select Perfor
 
 ## Privacy and security
 
-Telemetry stays on the Mac. SiliconPulse does not read SSIDs or serial numbers, does not enumerate local interface IP addresses, and sends no analytics. Network throughput comes from local interface counters. Network requests are made only when the optional latency probe is enabled. Notifications are local macOS notifications. The app does not require sudo, a privileged helper or App Sandbox entitlements.
+Telemetry stays on the Mac; there are no analytics. Wi-Fi collection does not read SSIDs. The hardware inventory can display device identifiers supplied by macOS, and connection inspection displays local and remote endpoints. These details are exported only when you request an export. The optional latency probe and explicitly started internet benchmark make network requests. Notifications are local. Routine telemetry needs no sudo or privileged helper; changing system-wide services or Low Power Mode can require administrator authorization.
 
 ## Compatibility
 
@@ -116,13 +113,7 @@ SiliconPulse requires macOS 14 or later and Apple Silicon. It was built and exer
 
 ## Performance
 
-Measurements below are from an Apple Silicon Mac running this release candidate. Each is a 20-second sample of the app process after a two-second startup settle; RSS is resident memory. They are observations, not guarantees for other systems.
-
-| State | CPU | Memory (RSS) |
-|---|---:|---:|
-| Menu bar only | 0.29% | 127.5 MiB |
-| Overlay only (sparklines off, 2 s refresh) | 1.86% | 128.6 MiB |
-| Pinned panel | 6.04% | 144.5 MiB |
+With the 1.2 native chart renderer, the open Summary window used **5.20% of one CPU core** over a 20-second CPU-time measurement on Apple M4 / macOS 27. This is one local observation, not a cross-device guarantee. Measurements from older builds are retained in [QA_REPORT.md](QA_REPORT.md); they do not describe this release. The monitor stops sampling when closed or minimized unless you explicitly start a recording.
 
 ## FAQ
 

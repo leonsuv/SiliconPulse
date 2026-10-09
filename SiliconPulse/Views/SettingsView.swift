@@ -34,7 +34,7 @@ struct SettingsView: View {
                     }
                 }
                 Spacer()
-                Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0")")
+                Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0")")
                     .font(.caption).foregroundStyle(.secondary).padding(12)
             }.padding(.horizontal, 10).frame(width: 180).background(.regularMaterial)
             Divider()

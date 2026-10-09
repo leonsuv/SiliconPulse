@@ -14,7 +14,7 @@ Live-Telemetrie für Apple Silicon in deiner Menüleiste.
 SiliconPulse ist ein nativer macOS-Menüleistenmonitor für Apple Silicon. Dashboard und optionales Overlay zeigen Batterie, CPU, GPU, Leistung, Arbeitsspeicher, Datenträger, Netzwerk und Temperaturzustand.
 
 - Kein sudo und kein privilegierter Helfer erforderlich.
-- SwiftUI, AppKit und Swift Charts ohne Drittanbieterpakete.
+- SwiftUI, AppKit und Core Animation ohne Drittanbieterpakete.
 - Das Dashboard misst nur, solange es sichtbar ist. Im geschlossenen Zustand misst die App Batterie und ausgewählten Menüleistenwert alle fünf Sekunden.
 
 
@@ -39,20 +39,17 @@ Die Speicheranalyse nutzt den MIT-lizenzierten Scanner aus [FastTree](https://gi
 
 ## Screenshots
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/dashboard-wide-dark.png">
-  <img alt="SiliconPulse 1.1 dashboard" src="docs/assets/screenshots/dashboard-wide-light.png" width="900">
-</picture>
+![SiliconPulse 1.2 CPU-Monitor auf Deutsch](docs/assets/screenshots/monitor-cpu-de-1-2.png)
 
-| Kompaktes Panel | Leistung im Detail | Einstellungen |
+| GPU-Leistung | Speicher | Apple-Silicon-Kerne |
 |---|---|---|
-| ![Panel](docs/assets/screenshots/dashboard-dark.png) | ![Leistung](docs/assets/screenshots/performance-dark.png) | ![Einstellungen](docs/assets/screenshots/settings-0-dark.png) |
+| ![GPU](docs/assets/screenshots/monitor-gpu-1-2.png) | ![Speicher](docs/assets/screenshots/monitor-memory-1-2.png) | ![Apple Silicon](docs/assets/screenshots/monitor-silicon-1-2.png) |
 
-Die Screenshots zeigen die echten App-Views mit lokal gemessenen Werten. Messwerte variieren je nach Mac und Zeitpunkt. Hell/Dunkel lässt sich unter **Allgemein → Darstellung** wählen.
+[CPU-Monitor im Dunkelmodus](docs/assets/screenshots/monitor-cpu-1-2.png). Aufnahmen ausschließlich aus SiliconPulse-Fenstern mit echten Messwerten. Werte variieren je nach Mac und Zeitpunkt.
 
 ## Installation
 
-1. Lade [SiliconPulse-1.1.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.1.0.zip) aus den GitHub Releases herunter.
+1. Lade [SiliconPulse-1.2.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.2.0.zip) aus den GitHub Releases herunter.
 2. Entpacke die Datei und verschiebe `SiliconPulse.app` nach `/Applications`.
 3. Die App ist ad-hoc signiert und nicht notarisiert. Klicke beim ersten Start mit gedrückter Ctrl-Taste auf die App und wähle **Öffnen** oder nutze **Systemeinstellungen → Datenschutz & Sicherheit → Dennoch öffnen**. Alternativ kannst du das Quarantäne-Attribut entfernen:
 
@@ -105,7 +102,7 @@ Das Skript baut das Swift-Paket, erstellt ein `LSUIElement`-App-Bundle, kopiert 
 
 ## Datenschutz und Sicherheit
 
-Die Telemetrie bleibt auf dem Mac. SiliconPulse liest keine SSIDs oder Seriennummern, ermittelt keine lokalen Interface-IP-Adressen und sendet keine Analysedaten. Netzwerkdurchsatz stammt aus lokalen Interface-Zählern. Netzwerkanfragen werden nur gesendet, wenn die optionale Latenzmessung aktiviert ist. Mitteilungen sind lokale macOS-Mitteilungen. sudo, privilegierter Helfer und App-Sandbox-Berechtigungen sind nicht erforderlich.
+Die Messwerte bleiben auf dem Mac; es gibt keine Analytics. Die WLAN-Abfrage liest keine SSIDs. Die Hardwareübersicht kann von macOS gelieferte Gerätekennungen anzeigen, die Verbindungsübersicht lokale und entfernte Endpunkte. Diese Details werden nur auf deinen Wunsch exportiert. Optionale Latenzprüfung und ausdrücklich gestarteter Internetbenchmark erzeugen Netzwerkverkehr. Mitteilungen sind lokal. Normale Telemetrie benötigt kein sudo und keinen privilegierten Helfer; Änderungen an systemweiten Diensten oder am Energiesparmodus können Administratorrechte erfordern.
 
 ## Kompatibilität
 
@@ -113,13 +110,7 @@ SiliconPulse benötigt macOS 14 oder neuer und Apple Silicon. Gebaut und ausprob
 
 ## Leistung
 
-Die folgenden Messungen stammen von einem Apple-Silicon-Mac mit diesem Release-Kandidaten. Je Zustand wurde der App-Prozess nach zwei Sekunden Startzeit 20 Sekunden lang beobachtet. RSS bezeichnet den belegten residenten Speicher. Andere Systeme können abweichen.
-
-| Zustand | CPU | Speicher (RSS) |
-|---|---:|---:|
-| Nur Menüleiste | 0,29 % | 127,5 MiB |
-| Overlay (ohne Sparklines, 2 s Aktualisierung) | 1,86 % | 128,6 MiB |
-| Angeheftetes Fenster | 6,04 % | 144,5 MiB |
+Mit dem nativen Chart-Renderer von Version 1.2 benötigte die geöffnete Übersicht über 20 Sekunden gemessen **5,20 % eines CPU-Kerns** auf Apple M4 / macOS 27. Das ist eine lokale Einzelmessung. Frühere Messungen stehen in [QA_REPORT.md](QA_REPORT.md) und beschreiben ältere Builds. Bei geschlossenem oder minimiertem Monitor endet die Messung, sofern keine Aufnahme ausdrücklich gestartet wurde.
 
 ## Häufige Fragen
 
