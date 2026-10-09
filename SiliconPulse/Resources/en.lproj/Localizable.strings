@@ -226,3 +226,23 @@
 
 "Private" = "Private";
 "Scanned" = "Scanned";
+
+"Pinned" = "Pinned";
+
+"Pin" = "Pin";
+
+"Monitor" = "Monitor";
+
+"Tools" = "Tools";
+
+"Search connections" = "Search connections";
+
+"Search applications" = "Search applications";
+
+"Search drivers" = "Search drivers";
+
+"Search hardware" = "Search hardware";
+
+"Search services" = "Search services";
+
+"Menu bar metrics" = "Menu bar metrics";

@@ -361,3 +361,23 @@
 
 "Private" = "Privat";
 "Scanned" = "Gescannt";
+
+"Pinned" = "Fixiert";
+
+"Pin" = "Anheften";
+
+"Monitor" = "Monitor";
+
+"Tools" = "Werkzeuge";
+
+"Search connections" = "Verbindungen suchen";
+
+"Search applications" = "Apps suchen";
+
+"Search drivers" = "Treiber suchen";
+
+"Search hardware" = "Hardware suchen";
+
+"Search services" = "Dienste suchen";
+
+"Menu bar metrics" = "Menüleistenwerte";

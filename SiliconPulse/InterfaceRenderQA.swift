@@ -36,6 +36,16 @@ import SwiftUI
                 }
             }
         }
+        let monitor = MonitorWindowController.shared
+        monitor.show()
+        if let window = monitor.window {
+            window.setContentSize(NSSize(width: 1100, height: 760))
+            try capture(window, to: output.appendingPathComponent("monitor-navigation.png"))
+            monitor.model.selection = "CPU"
+            monitor.model.selectSection("Performance")
+            try capture(window, to: output.appendingPathComponent("monitor-performance-navigation.png"))
+            window.close()
+        }
         // Verify the supported minimum, independently of a saved window frame.
         panel.panel.setContentSize(NSSize(width: 340, height: 420))
         panel.category = "Overview"

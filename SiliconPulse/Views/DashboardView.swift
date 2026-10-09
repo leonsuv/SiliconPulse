@@ -51,14 +51,7 @@ struct DashboardView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
                         if category == "Overview", !panelController.editMode {
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: geometry.size.width >= 650 ? 4 : 2), spacing: 8) {
-                                GlanceTile(title: "CPU", value: model.value(for: "CPU %"), points: model.cpuHistory, color: .blue)
-                                GlanceTile(title: "GPU", value: model.value(for: "GPU %"), points: model.gpuHistory, color: .teal)
-                                GlanceTile(title: "Memory", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple)
-                                GlanceTile(title: "Battery power", value: model.value(for: "Battery W"), points: model.batteryPowerHistory, color: .orange)
-                            }
-                            .padding(.bottom, 4)
-                            .background { WindowDragHandle(enabled: panelController.isPinned) }
+                            overview
                         }
                         if category == "Energy", !panelController.editMode {
                             LowPowerModeControl().toggleStyle(.switch)
@@ -66,7 +59,7 @@ struct DashboardView: View {
                                 .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
                         }
                         // One continuous column keeps related measurements together.
-                        ForEach(cards, id: \.self) { title in
+                        ForEach(category == "Overview" && !panelController.editMode ? [] : cards, id: \.self) { title in
                             CardView(title: title, isHidden: !model.visibleSections.contains(title), editMode: panelController.editMode, expansion: Binding(get: {
                                 category == "Overview" ? panelController.overviewExpanded.contains(title) : model.expanded.contains(title)
                             }, set: { value in
@@ -99,7 +92,7 @@ struct DashboardView: View {
                 HStack(spacing: 12) {
                     Label("Live", systemImage: "circle.fill").foregroundStyle(.green)
                     Spacer(minLength: 0)
-                    Button("Details") { MonitorWindowController.shared.show() }
+                    Button("Open monitor…") { MonitorWindowController.shared.show() }
                         .help("Open monitor")
                     Button { model.copySnapshot() } label: { Image(systemName: "doc.on.doc") }
                         .help("Copy snapshot").accessibilityLabel("Copy snapshot")
@@ -128,6 +121,59 @@ struct DashboardView: View {
         .environment(\.locale, model.locale)
     }
 
+    private func openMetric(_ metric: String) {
+        MonitorWindowController.shared.model.selection = metric
+        MonitorWindowController.shared.show(section: "Performance")
+    }
+
+    private var overview: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Overview").font(.headline)
+                Spacer()
+                Label("Live", systemImage: "circle.fill").font(.caption).foregroundStyle(.green)
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                overviewTile("CPU", metric: "CPU", value: model.value(for: "CPU %"), points: model.cpuHistory, color: .blue)
+                overviewTile("GPU", metric: "GPU", value: model.value(for: "GPU %"), points: model.gpuHistory, color: .teal)
+                overviewTile("Memory", metric: "Memory", value: model.value(for: "RAM %"), points: model.memoryHistory, color: .purple)
+                overviewTile("Battery", metric: "Energy", value: model.value(for: "Battery %"), points: [], color: .green)
+            }
+            VStack(spacing: 0) {
+                quickRow("Power & Frequency", icon: "bolt", value: model.value(for: "Power W"), section: "Power & Frequency")
+                Divider().padding(.leading, 40)
+                quickRow("Processes", icon: "list.bullet.rectangle", value: "", section: "Processes")
+                Divider().padding(.leading, 40)
+                quickRow("Disk Space", icon: "internaldrive", value: "", section: "Disk Space")
+            }.background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+            LowPowerModeControl().toggleStyle(.switch).padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+            Button { MonitorWindowController.shared.show() } label: {
+                HStack { Label("Open monitor…", systemImage: "macwindow"); Spacer(); Image(systemName: "arrow.up.right") }
+                    .padding(12).frame(maxWidth: .infinity)
+            }.buttonStyle(.borderedProminent).controlSize(.large)
+        }
+    }
+
+    private func overviewTile(_ title: String, metric: String, value: String, points: [TelemetryPoint], color: Color) -> some View {
+        Button { openMetric(metric) } label: {
+            GlanceTile(title: title, value: value, points: points, color: color)
+                .overlay(alignment: .topTrailing) { Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold)).foregroundStyle(.tertiary).padding(10) }
+        }.buttonStyle(.plain).help(Text("Open monitor…"))
+    }
+
+    private func quickRow(_ title: String, icon: String, value: String, section: String) -> some View {
+        Button { MonitorWindowController.shared.show(section: section) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: icon).foregroundStyle(.blue).frame(width: 20)
+                Text(LocalizedStringKey(title))
+                Spacer(minLength: 4)
+                Text(value).monospacedDigit().foregroundStyle(.secondary)
+                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+            }.font(.callout).padding(12).contentShape(Rectangle())
+        }.buttonStyle(.plain)
+    }
+
     private var header: some View {
         HStack(spacing: 6) {
             Image(systemName: "waveform.path.ecg").font(.system(size: 15, weight: .semibold)).foregroundStyle(.blue)
@@ -137,15 +183,13 @@ struct DashboardView: View {
                 Text(model.snapshot.system.chip ?? "Apple Silicon").font(.caption2).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            Button { OverlayController.active?.toggle() } label: { Image(systemName: "rectangle.dashed") }
-                .help(Text(OverlayL10n.text("Overlay mode", locale: model.locale))).accessibilityLabel(OverlayL10n.text("Overlay mode", locale: model.locale))
             Button { panelController.setPinned(!panelController.isPinned) } label: {
-                Image(systemName: panelController.isPinned ? "pin.fill" : "pin").foregroundStyle(panelController.isPinned ? Color.blue : Color.secondary)
-            }.help(panelController.isPinned ? Text("Unpin panel") : Text("Pin panel"))
-                .accessibilityLabel(panelController.isPinned ? "Unpin panel" : "Pin panel")
-            Button { panelController.editMode.toggle() } label: { Image(systemName: panelController.editMode ? "checkmark.circle.fill" : "slider.horizontal.3") }
-                .help(panelController.editMode ? Text("Done editing") : Text("Edit cards"))
-                .accessibilityLabel(panelController.editMode ? "Done editing" : "Edit cards")
+                Label(panelController.isPinned ? "Pinned" : "Pin", systemImage: panelController.isPinned ? "pin.fill" : "pin")
+                    .foregroundStyle(panelController.isPinned ? Color.blue : Color.secondary)
+            }.fixedSize().help(panelController.isPinned ? Text("Unpin panel") : Text("Pin panel"))
+            if panelController.editMode {
+                Button("Done editing") { panelController.editMode = false }
+            }
             Button { SettingsWindowController.shared.show(model: model) } label: { Image(systemName: "gearshape") }
                 .keyboardShortcut(",", modifiers: .command).help("Settings").accessibilityLabel("Settings")
             if panelController.isPinned {
@@ -159,7 +203,7 @@ struct DashboardView: View {
 private struct PanelToolStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
-            .frame(width: 22, height: 28)
+            .padding(.horizontal, 6).frame(height: 28)
             .background(configuration.isPressed ? Color.primary.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 6))
     }
 
@@ -186,7 +230,7 @@ private struct GlanceTile: View {
     let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 5) {
                 Circle().fill(color).frame(width: 5, height: 5)
                 Text(LocalizedStringKey(title)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -195,12 +239,14 @@ private struct GlanceTile: View {
                 Text(value).font(.system(size: 20, weight: .semibold)).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                TelemetryChart(lines: [TelemetryChartLine(name: title, points: points, color: color)], window: 31)
-                    .frame(width: 64, height: 24)
-                    .accessibilityLabel(Text("\(title) history"))
+                if !points.isEmpty {
+                    TelemetryChart(lines: [TelemetryChartLine(name: title, points: points, color: color)], window: 31)
+                        .frame(width: 56, height: 24)
+                        .accessibilityLabel(Text("\(title) history"))
+                }
             }
         }
-        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
     }
 }

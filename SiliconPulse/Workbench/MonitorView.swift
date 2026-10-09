@@ -16,7 +16,9 @@ struct MonitorView: View {
             VStack(spacing: 0) {
                 Label("SiliconPulse", systemImage: "waveform.path.ecg").font(.headline).padding(18).frame(maxWidth: .infinity, alignment: .leading)
                 List(selection: Binding<String?>(get: { monitor.section }, set: { if let value = $0 { monitor.selectSection(value) } })) {
-                    ForEach(Self.sections, id: \.0) { item in HStack { Image(systemName: item.1).foregroundStyle(.blue).frame(width: 20); Text(LocalizedStringKey(item.0)) }.tag(item.0).padding(.vertical, 3) }
+                    Section("Monitor") { navigationRows(["Summary", "Performance", "Processes", "Power & Frequency", "Apple Silicon"]) }
+                    Section("Tools") { navigationRows(["Flight Recorder", "Connections", "Disk Space", "Benchmarks"]) }
+                    Section("System") { navigationRows(["System Info", "Startup apps", "Users", "Services", "Installed Apps", "Drivers"]) }
                 }.listStyle(.sidebar)
                 Divider()
                 HStack {
@@ -27,7 +29,7 @@ struct MonitorView: View {
                         Picker("Accent color", selection: $accent) { ForEach(["Blue", "Teal", "Green", "Orange", "Purple"], id: \.self) { Text(LocalizedStringKey($0)).tag($0) } }
                     } label: { Image(systemName: "paintpalette") }.menuStyle(.borderlessButton).fixedSize()
                 }.font(.caption).padding(16)
-            }.frame(width: 195).background(.regularMaterial)
+            }.frame(width: 215).background(.regularMaterial)
             Divider()
             VStack(spacing: 0) {
                 HStack {
@@ -35,12 +37,12 @@ struct MonitorView: View {
                     Spacer()
                     if monitor.isLoading { ProgressView().controlSize(.small) }
                     if ["Processes", "Users", "Startup apps", "Services", "Connections", "Installed Apps", "Drivers", "System Info"].contains(monitor.section) {
-                        TextField("Search by name, user or PID", text: $settings.query).textFieldStyle(.roundedBorder).frame(width: 220)
+                        TextField(LocalizedStringKey(searchHint), text: $settings.query).textFieldStyle(.roundedBorder).frame(width: 220)
                     }
                     if monitor.section == "Installed Apps" { Button("Calculate sizes") { monitor.calculateAppSizes() }.disabled(monitor.calculatingAppSizes) }
                     if ["System Info", "Startup apps", "Services", "Connections", "Installed Apps", "Drivers"].contains(monitor.section) {
-                        Button { monitor.reload() } label: { Image(systemName: "arrow.clockwise") }.help("Refresh")
-                        Button { monitor.exportRows() } label: { Image(systemName: "square.and.arrow.up") }.help("Export…").disabled(monitor.rows.isEmpty && monitor.sockets.isEmpty)
+                        Button { monitor.reload() } label: { Label("Refresh", systemImage: "arrow.clockwise") }.help("Refresh")
+                        Button { monitor.exportRows() } label: { Label("Export…", systemImage: "square.and.arrow.up") }.help("Export…").disabled(monitor.rows.isEmpty && monitor.sockets.isEmpty)
                     }
                 }.padding(18)
                 Divider()
@@ -58,6 +60,24 @@ struct MonitorView: View {
         .tint(tint).background(Color(nsColor: .windowBackgroundColor))
         .environment(\.locale, app.locale)
         .alert("SiliconPulse", isPresented: Binding(get: { monitor.message != nil }, set: { if !$0 { monitor.message = nil } })) { Button("OK", role: .cancel) { monitor.message = nil } } message: { Text(monitor.message ?? "") }
+    }
+    private var searchHint: String {
+        switch monitor.section {
+        case "Processes", "Users": "Search by name, user or PID"
+        case "Connections": "Search connections"
+        case "Installed Apps": "Search applications"
+        case "Drivers": "Search drivers"
+        case "System Info": "Search hardware"
+        default: "Search services"
+        }
+    }
+    @ViewBuilder private func navigationRows(_ names: [String]) -> some View {
+        ForEach(names, id: \.self) { name in
+            HStack(spacing: 9) {
+                Image(systemName: Self.sections.first(where: { $0.0 == name })?.1 ?? "circle").foregroundStyle(tint).frame(width: 20)
+                Text(LocalizedStringKey(name)).lineLimit(1)
+            }.tag(name).padding(.vertical, 3)
+        }
     }
     @ViewBuilder private var sectionContent: some View {
         switch monitor.section {

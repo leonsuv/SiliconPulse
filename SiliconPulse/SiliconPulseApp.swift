@@ -162,32 +162,54 @@ import AppKit
     }
     func applicationWillTerminate(_ notification: Notification) { panelController.persistFrame() }
 
-    @objc private func togglePanel() { if overlayController.isActive { overlayController.deactivate() } else { panelController.toggle() } }
+    @objc private func togglePanel() { if overlayController.isActive { overlayController.deactivate(); panelController.show() } else { panelController.toggle() } }
 
     @objc private func showContextMenu(_ recognizer: NSClickGestureRecognizer) {
         guard recognizer.state == .ended else { return }
         let menu = NSMenu()
-        let pin = NSMenuItem(title: panelController.isPinned ? "Unpin" : "Pin", action: #selector(togglePin), keyEquivalent: "")
-        pin.target = self
-        menu.addItem(pin)
-        menu.addItem(.separator())
-        let monitor = NSMenuItem(title: OverlayL10n.text("Open monitor…", locale: AppModel.shared.locale), action: #selector(openMonitor), keyEquivalent: "0")
-        monitor.target = self
-        menu.addItem(monitor)
-        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
-        settings.target = self
-        menu.addItem(settings)
-        if overlayController.isActive {
-            let overlaySettings = NSMenuItem(title: "Overlay Settings…", action: #selector(openSettings), keyEquivalent: "")
-            overlaySettings.target = self
-            menu.addItem(overlaySettings)
+        func item(_ title: String, _ action: Selector, key: String = "", section: String? = nil) {
+            let entry = NSMenuItem(title: OverlayL10n.text(title, locale: AppModel.shared.locale), action: action, keyEquivalent: key)
+            entry.target = self; entry.representedObject = section; menu.addItem(entry)
         }
+        item("Overview", #selector(showOverview))
+        item("Open monitor…", #selector(openMonitor), key: "0")
+        item("Processes", #selector(openMonitorSection(_:)), section: "Processes")
+        item("Disk Space", #selector(openMonitorSection(_:)), section: "Disk Space")
+        item("Flight Recorder", #selector(openMonitorSection(_:)), section: "Flight Recorder")
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit SiliconPulse", action: #selector(quit), keyEquivalent: "q")
-        quit.target = self
-        menu.addItem(quit)
+        item(panelController.isPinned ? "Unpin panel" : "Pin panel", #selector(togglePin))
+        menu.items.last?.state = panelController.isPinned ? .on : .off
+        item("Overlay mode", #selector(toggleOverlay))
+        menu.items.last?.state = overlayController.isActive ? .on : .off
+        item("Edit cards", #selector(editCards))
+        let metricsItem = NSMenuItem(title: OverlayL10n.text("Menu bar metrics", locale: AppModel.shared.locale), action: nil, keyEquivalent: "")
+        let metricsMenu = NSMenu()
+        for metric in AppModel.menuOptions {
+            let entry = NSMenuItem(title: OverlayL10n.text(metric, locale: AppModel.shared.locale), action: #selector(toggleMenuMetric(_:)), keyEquivalent: "")
+            entry.target = self; entry.representedObject = metric
+            entry.state = AppModel.shared.menuMetrics.contains(metric) ? .on : .off
+            metricsMenu.addItem(entry)
+        }
+        metricsItem.submenu = metricsMenu; menu.addItem(metricsItem)
+        item("Settings", #selector(openSettings), key: ",")
+        menu.addItem(.separator())
+        item("Quit SiliconPulse", #selector(quit), key: "q")
         if let button = statusItem.button { menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY), in: button) }
     }
+
+    @objc private func toggleMenuMetric(_ sender: NSMenuItem) {
+        guard let metric = sender.representedObject as? String else { return }
+        let model = AppModel.shared
+        if model.menuMetrics.contains(metric) { model.menuMetrics.removeAll { $0 == metric } }
+        else { model.menuMetrics.append(metric) }
+    }
+
+    @objc private func showOverview() {
+        if overlayController.isActive { overlayController.deactivate() }
+        panelController.category = "Overview"; panelController.editMode = false; panelController.show()
+    }
+    @objc private func editCards() { panelController.editMode = true; panelController.show() }
+    @objc private func openMonitorSection(_ sender: NSMenuItem) { MonitorWindowController.shared.show(section: sender.representedObject as? String ?? "Summary") }
 
     @objc private func togglePin() { panelController.setPinned(!panelController.isPinned) }
     @objc private func toggleOverlay() { overlayController.toggle() }
@@ -205,12 +227,18 @@ import AppKit
         let iconName = metrics.first.map { AppModel.shared.menuSymbol(for: $0) } ?? "waveform.path.ecg"
         button?.image = AppModel.shared.showMenuIcons ? NSImage(systemSymbolName: iconName, accessibilityDescription: "SiliconPulse") : nil
         let parts = metrics.map { metric -> String in
-            let value = String(AppModel.shared.value(for: metric).prefix(9)).padding(toLength: 9, withPad: " ", startingAt: 0)
+            let value = String(AppModel.shared.value(for: metric).prefix(9))
             return "\(metric == "Battery %" ? "" : "\(metric.replacingOccurrences(of: " %", with: "")) ")\(value)"
         }
         let separator: String = switch AppModel.shared.menuSeparator { case "Bar": "  |  "; case "Space": "     "; default: "  ·  " }
         let text = parts.isEmpty ? "SiliconPulse" : parts.joined(separator: separator)
-        button?.attributedTitle = NSAttributedString(string: text, attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])
+        button?.attributedTitle = NSAttributedString(string: text, attributes: [.font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .medium)])
+        let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .medium)
+        let reserved = metrics.map { metric in
+            (metric == "Battery %" ? "" : metric.replacingOccurrences(of: " %", with: "") + " ") + String(repeating: "0", count: ["Battery %", "CPU %", "GPU %", "RAM %"].contains(metric) ? 4 : 9)
+        }.joined(separator: separator)
+        let width = ((reserved.isEmpty ? "SiliconPulse" : reserved) as NSString).size(withAttributes: [.font: font]).width
+        statusItem.length = ceil(max(width, (text as NSString).size(withAttributes: [.font: font]).width)) + (AppModel.shared.showMenuIcons ? 30 : 12)
         button?.toolTip = metrics.map { "\($0): \(AppModel.shared.value(for: $0))" }.joined(separator: "\n")
     }
 }

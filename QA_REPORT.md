@@ -77,3 +77,12 @@ The new build was launched and its Summary window inspected through accessibilit
 The release build reports version 1.2.0. Both the executable and bundled scanner report arm64. `codesign --verify --deep --strict` passed. Existing release workflows run the single battery-health smoke test; no extra tests were added. Release screenshot capture runs under an isolated preferences domain, waits for real telemetry, and captures only its own Monitor window using `screencapture -l`; it does not capture the desktop or use generated telemetry.
 
 Five 1.2 release screenshots were captured with `screencapture -l` and individually inspected: CPU, GPU, Memory and Apple Silicon in English/Dark, plus CPU in German/Light. They contain the app's telemetry and no personal paths, usernames, device serials or connection endpoints. README galleries reference these new images. The local release zip passed `unzip -t`.
+
+## Tray and navigation UX — 2026-10-10
+
+- Replaced the tray overview's full collapsed card list with four clickable metric tiles (CPU, GPU, memory, battery charge), direct links to sensors/processes/storage, Low Power Mode, and a prominent Monitor action. Detailed cards and card customization remain in their existing categories.
+- Added grouped Monitor navigation (Monitor, Tools, System), contextual search prompts, and labeled refresh/export actions.
+- Reworked the status-item menu with direct Monitor destinations, pin/overlay state indicators, card editing, settings, and a checked metric-selection submenu. Left-click during overlay mode now exits the overlay and opens the panel.
+- Removed padded value strings in the menu bar; reserve a measured segment width with a monospaced font to keep ordinary numeric changes from moving the label.
+- Local release build succeeded. Rendered production SwiftUI/AppKit views inspected in light/dark at 420 pt and 760 pt widths and at the 340×420 pt minimum, including Settings and Monitor navigation. Render artifacts are local under /tmp/siliconpulse-ux-final, not release assets. The Monitor render is a layout check before its collector warmup, so its n/a values are not a telemetry validation.
+- Accessibility inspection exposed the new overview buttons, pin action, Settings action and Low Power Mode control. End-to-end clicking of every new destination was not completed: native UI targeting selected another existing Settings window with the same app identity. No claim of a complete interaction regression pass. No new tests or CI run; existing CI issue remains outside this UI pass.
