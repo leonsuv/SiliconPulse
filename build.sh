@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 if [[ -f release.config ]]; then source release.config; fi
 BUNDLE_ID="${BUNDLE_ID:-io.github.leonsuv.SiliconPulse}"
-VERSION="${VERSION:-1.2.0}"
+VERSION="${VERSION:-1.2.1}"
 swift build -c release --arch arm64
 APP="$ROOT/SiliconPulse.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

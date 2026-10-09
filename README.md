@@ -20,7 +20,7 @@ SiliconPulse is a native macOS menu bar monitor for Apple Silicon. Its dashboard
 
 ## Monitor window
 
-Choose **Details** in the panel or **Open monitor…** in the status menu to open the resizable monitor. The menu bar app remains available.
+Choose **Open monitor…** in the panel or **Open monitor…** in the status menu to open the resizable monitor. The menu bar app remains available.
 
 - Summary and performance views for CPU, E/P cores, GPU, memory, storage, network, energy and temperatures.
 - Searchable process list/tree, user totals and process details; confirmed termination of your own processes.
@@ -39,6 +39,8 @@ Disk scanning incorporates the MIT-licensed native scanner from [FastTree](https
 
 ## Screenshots
 
+![SiliconPulse 1.2.1 tray overview](docs/assets/screenshots/tray-overview-1-2-1.png)
+
 ![SiliconPulse 1.2 CPU performance monitor](docs/assets/screenshots/monitor-cpu-1-2.png)
 
 | GPU performance | Memory | Apple Silicon cores |
@@ -49,7 +51,7 @@ Disk scanning incorporates the MIT-licensed native scanner from [FastTree](https
 
 ## Install
 
-1. Download [SiliconPulse-1.2.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.2.0.zip) from GitHub Releases.
+1. Download [SiliconPulse-1.2.1.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.2.1.zip) from GitHub Releases.
 2. Unzip it and move `SiliconPulse.app` to `/Applications`.
 3. The app is ad-hoc signed and not notarized. On first launch, Control-click it and choose **Open**, or use **System Settings → Privacy & Security → Open Anyway**. Alternatively, remove quarantine yourself:
 

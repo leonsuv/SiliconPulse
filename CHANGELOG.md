@@ -2,6 +2,23 @@
 
 All notable changes to SiliconPulse are documented here.
 
+## [1.2.1] - 2026-10-10
+
+### Changed
+- Compact, clickable tray overview with direct CPU, GPU, memory and battery detail navigation.
+- Direct tray shortcuts to processes, storage analysis and sensors; Low Power Mode is available in the overview.
+- Grouped Monitor navigation, contextual search labels and named refresh/export actions.
+- Right-click tray menu with checked pin/overlay states and direct menu bar metric selection.
+- Menu bar labels reserve measured widths instead of padding values with spaces.
+
+### Fixed
+- Clicking the menu bar item during overlay mode now opens the panel after leaving the overlay.
+
+### Verification
+- Local arm64 release build and production UI renders checked in light/dark, compact/wide and minimum panel sizes.
+- Full interaction regression was not completed. Hosted CI is bypassed for this release at the maintainer's request; the uploaded app is the locally built artifact.
+- Ad-hoc signed, not notarized; other chip/macOS combinations remain untested.
+
 ## [1.2.0] - 2026-10-10
 
 ### Added

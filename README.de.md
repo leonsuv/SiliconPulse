@@ -20,7 +20,7 @@ SiliconPulse ist ein nativer macOS-Menüleistenmonitor für Apple Silicon. Dashb
 
 ## Monitorfenster
 
-**Details** im Panel oder **Monitor öffnen …** im Menü öffnet das neue, vergrößerbare Monitorfenster. Die Menüleisten-App bleibt erhalten.
+**Monitor öffnen …** im Panel oder **Monitor öffnen …** im Menü öffnet das neue, vergrößerbare Monitorfenster. Die Menüleisten-App bleibt erhalten.
 
 - Übersicht und Leistungsansichten für CPU, E-/P-Kerne, GPU, Speicher, SSD, Netzwerk, Energie und Temperaturen.
 - Prozessliste, Prozessbaum, Filter, Benutzersummen und Details. Eigene Prozesse lassen sich nach Bestätigung beenden.
@@ -39,6 +39,8 @@ Die Speicheranalyse nutzt den MIT-lizenzierten Scanner aus [FastTree](https://gi
 
 ## Screenshots
 
+![SiliconPulse 1.2.1 tray overview](docs/assets/screenshots/tray-overview-1-2-1.png)
+
 ![SiliconPulse 1.2 CPU-Monitor auf Deutsch](docs/assets/screenshots/monitor-cpu-de-1-2.png)
 
 | GPU-Leistung | Speicher | Apple-Silicon-Kerne |
@@ -49,7 +51,7 @@ Die Speicheranalyse nutzt den MIT-lizenzierten Scanner aus [FastTree](https://gi
 
 ## Installation
 
-1. Lade [SiliconPulse-1.2.0.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.2.0.zip) aus den GitHub Releases herunter.
+1. Lade [SiliconPulse-1.2.1.zip](https://github.com/leonsuv/SiliconPulse/releases/latest/download/SiliconPulse-1.2.1.zip) aus den GitHub Releases herunter.
 2. Entpacke die Datei und verschiebe `SiliconPulse.app` nach `/Applications`.
 3. Die App ist ad-hoc signiert und nicht notarisiert. Klicke beim ersten Start mit gedrückter Ctrl-Taste auf die App und wähle **Öffnen** oder nutze **Systemeinstellungen → Datenschutz & Sicherheit → Dennoch öffnen**. Alternativ kannst du das Quarantäne-Attribut entfernen:
 
